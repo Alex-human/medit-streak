@@ -1,8 +1,15 @@
 import "./globals.css";
+import type { Metadata } from "next";
 
-export const metadata = {
+export const metadata: Metadata = {
   title: "Medit Streak",
   description: "Streak + Timer (offline-first base)",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Medit Streak",
+  },
 };
 
 export default function RootLayout({
@@ -16,14 +23,3 @@ export default function RootLayout({
     </html>
   );
 }
-
-export const metadata = {
-  title: "Medit Streak",
-  description: "Streak + Timer (offline-first base)",
-  manifest: "/manifest.webmanifest",
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: "default",
-    title: "Medit Streak",
-  },
-};

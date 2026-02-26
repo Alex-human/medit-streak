@@ -22,41 +22,7 @@ export default function TimerCard({
   const [running, setRunning] = useState(false);
   const endAtRef = useRef<number | null>(null);
   const gongRef = useRef<HTMLAudioElement | null>(null);
-  const gongUnlockedRef = useRef(false);
   const finishTimeoutRef = useRef<number | null>(null);
-
-  const primeGongForPlayback = useCallback(() => {
-    const gong = gongRef.current;
-    if (!gong || gongUnlockedRef.current) return;
-
-    const prevMuted = gong.muted;
-    const prevVolume = gong.volume;
-    gong.muted = true;
-    gong.volume = 0;
-
-    const maybePromise = gong.play();
-    if (maybePromise && typeof maybePromise.then === "function") {
-      void maybePromise
-        .then(() => {
-          gong.pause();
-          gong.currentTime = 0;
-          gong.muted = prevMuted;
-          gong.volume = prevVolume;
-          gongUnlockedRef.current = true;
-        })
-        .catch(() => {
-          gong.muted = prevMuted;
-          gong.volume = prevVolume;
-        });
-      return;
-    }
-
-    gong.pause();
-    gong.currentTime = 0;
-    gong.muted = prevMuted;
-    gong.volume = prevVolume;
-    gongUnlockedRef.current = true;
-  }, []);
 
   const getRemainingSeconds = useCallback((endAt: number) => {
     return Math.max(0, Math.ceil((endAt - Date.now()) / 1000));
@@ -181,7 +147,6 @@ export default function TimerCard({
         {!running ? (
           <button
             onClick={() => {
-              primeGongForPlayback();
               const durationSeconds = secondsLeft > 0 ? secondsLeft : minutes * 60;
               setSecondsLeft(durationSeconds);
               endAtRef.current = Date.now() + durationSeconds * 1000;

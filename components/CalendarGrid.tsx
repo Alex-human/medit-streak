@@ -60,12 +60,13 @@ export default function CalendarGrid({
               key={day}
               onClick={() => onDayClick(day)}
               className={[
-                "h-10 rounded-xl text-sm font-semibold tabular-nums",
+                "h-10 rounded-xl text-sm font-semibold tabular-nums backdrop-blur-[10px]",
                 "transition duration-200 active:scale-[0.98]",
-                completed
-                  ? "border border-white/60 bg-white/32 shadow-[0_8px_18px_rgba(10,22,46,0.22)]"
-                  : "border border-white/35 bg-white/12 hover:bg-white/20",
-                isToday ? "ring-2 ring-cyan-200/80" : "",
+                isToday
+                  ? "border-2 border-white/75 bg-white/15 shadow-[0_0_0_1px_rgba(255,255,255,0.35),0_0_18px_rgba(255,255,255,0.32)]"
+                  : completed
+                    ? "border border-white/45 bg-black/25 shadow-[0_8px_18px_rgba(10,22,46,0.28)]"
+                    : "border border-white/35 bg-white/15 hover:bg-white/22",
               ].join(" ")}
               title={day}
             >

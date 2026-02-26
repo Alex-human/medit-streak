@@ -6,8 +6,8 @@
 
 :root {
   color-scheme: light;
-  --app-text: #f4f8ff;
-  --muted-text: rgba(235, 244, 255, 0.78);
+  --app-text: #f5f5f5;
+  --muted-text: #ffffff;
   --glass-bg: rgba(255, 255, 255, 0.18);
   --glass-bg-strong: rgba(255, 255, 255, 0.25);
   --glass-border: rgba(255, 255, 255, 0.45);
@@ -266,7 +266,7 @@ body {
 }
 
 .glass-input::placeholder {
-  color: rgba(238, 246, 255, 0.68);
+  color: #ffffff;
 }
 
 .glass-chip {

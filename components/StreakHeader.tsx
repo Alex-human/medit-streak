@@ -1,11 +1,14 @@
 export default function StreakHeader({ streak }: { streak: number }) {
   return (
-    <div className="rounded-2xl p-4 bg-white/80 shadow-sm border border-neutral-200">
-      <div className="text-sm text-neutral-600">Racha</div>
-      <div className="text-3xl font-bold tracking-tight">🔥 {streak} días</div>
-      <div className="text-xs text-neutral-500 mt-1">
-        Días consecutivos con meditación completada.
+    <div className="glass-panel p-4">
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <div className="text-sm muted">Racha actual</div>
+          <div className="glass-title text-4xl font-semibold tracking-tight mt-1 tabular-nums">🔥 {streak} días</div>
+        </div>
+        <div className="glass-panel-soft px-3 py-2 text-xs muted">Consistencia</div>
       </div>
+      <div className="text-xs muted mt-2">Días consecutivos con meditación completada.</div>
     </div>
   );
 }

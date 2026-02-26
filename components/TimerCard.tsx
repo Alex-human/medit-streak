@@ -21,107 +21,82 @@ export default function TimerCard({
   const [secondsLeft, setSecondsLeft] = useState<number>(minutes * 60);
   const [running, setRunning] = useState(false);
   const endAtRef = useRef<number | null>(null);
+  const gongRef = useRef<HTMLAudioElement | null>(null);
 
   const getRemainingSeconds = useCallback((endAt: number) => {
     return Math.max(0, Math.ceil((endAt - Date.now()) / 1000));
   }, []);
 
-  const syncRemainingFromClock = useCallback(() => {
-    const endAt = endAtRef.current;
-    if (!endAt) return;
-    setSecondsLeft(getRemainingSeconds(endAt));
-  }, [getRemainingSeconds]);
-
-  useEffect(() => {
-    if (!running) {
-      endAtRef.current = null;
-      setSecondsLeft(minutes * 60);
-    }
-  }, [minutes]);
-
   useEffect(() => {
     if (!running) return;
-    if (secondsLeft <= 0) {
-      setRunning(false);
-      return;
-    }
 
-    if (!endAtRef.current) {
-      endAtRef.current = Date.now() + secondsLeft * 1000;
-    }
+    const tick = () => {
+      const endAt = endAtRef.current;
+      if (!endAt) return;
 
-    syncRemainingFromClock();
-    const id = setInterval(syncRemainingFromClock, 250);
-    const onVisibilityOrFocus = () => syncRemainingFromClock();
-    window.addEventListener("visibilitychange", onVisibilityOrFocus);
-    window.addEventListener("focus", onVisibilityOrFocus);
-    window.addEventListener("pageshow", onVisibilityOrFocus);
+      const next = getRemainingSeconds(endAt);
+      setSecondsLeft(next);
+
+      if (next === 0) {
+        setRunning(false);
+        endAtRef.current = null;
+
+        const gong = gongRef.current;
+        if (gong) {
+          try {
+            gong.currentTime = 0;
+            void gong.play();
+          } catch {
+            // No-op when autoplay policies block sound.
+          }
+        }
+
+        onFinish?.();
+      }
+    };
+
+    const id = setInterval(tick, 250);
+    window.addEventListener("visibilitychange", tick);
+    window.addEventListener("focus", tick);
+    window.addEventListener("pageshow", tick);
 
     return () => {
       clearInterval(id);
-      window.removeEventListener("visibilitychange", onVisibilityOrFocus);
-      window.removeEventListener("focus", onVisibilityOrFocus);
-      window.removeEventListener("pageshow", onVisibilityOrFocus);
+      window.removeEventListener("visibilitychange", tick);
+      window.removeEventListener("focus", tick);
+      window.removeEventListener("pageshow", tick);
     };
-  }, [running, secondsLeft, syncRemainingFromClock]);
-
-  useEffect(() => {
-    if (running && secondsLeft === 0) {
-      setRunning(false);
-      endAtRef.current = null;
-
-      // sonar gong (si falla por restricciones del navegador, no rompe)
-      const gong = gongRef.current;
-      if (gong) {
-        try {
-          gong.currentTime = 0;
-          void gong.play();
-        } catch {}
-      }
-
-      onFinish?.();
-    }
-  }, [running, secondsLeft, onFinish]);
-
-  const gongRef = useRef<HTMLAudioElement | null>(null);
-
-  useEffect(() => {
-    // se crea una vez en cliente
-    gongRef.current = new Audio("/sounds/gong.mp3");
-    gongRef.current.preload = "auto";
-  }, []);
+  }, [running, getRemainingSeconds, onFinish]);
 
   const label = useMemo(() => formatSeconds(secondsLeft), [secondsLeft]);
 
   return (
-    <div className="rounded-2xl p-4 bg-white/80 shadow-sm border border-neutral-200">
-      <div className="flex items-center justify-center mb-3">
-        <div className={running ? "anim-floaty text-5xl select-none" : "text-5xl select-none"}>
-          🧘‍♂️
-        </div>
-      </div>
-      <div className="flex items-center justify-between">
-        <div className="font-semibold">Cronómetro</div>
-        <div className="text-3xl font-bold tabular-nums">{label}</div>
+    <div className="glass-panel p-4">
+      <audio ref={gongRef} src="/sounds/gong.mp3" preload="auto" />
+
+      <div className="flex items-center justify-center mb-4">
+        <div className={running ? "anim-floaty text-6xl select-none" : "text-6xl select-none"}>🧘‍♂️</div>
       </div>
 
-      <div className="flex gap-2 mt-3 flex-wrap">
+      <div className="flex items-center justify-between">
+        <div className="text-sm muted">Cronómetro</div>
+        <div className="glass-title text-4xl font-semibold tabular-nums">{label}</div>
+      </div>
+
+      <div className="flex gap-2 mt-4 flex-wrap">
         {PRESETS.map((p) => (
           <button
             key={p}
             onClick={() => {
-              if (!running) {
-                setMinutes(p);
-                onMinutesChange?.(p);
-              }
+              if (running) return;
+              setMinutes(p);
+              setSecondsLeft(p * 60);
+              onMinutesChange?.(p);
             }}
             className={[
-              "px-3 py-2 rounded-xl border text-sm font-semibold",
-              "transition active:scale-[0.98]",
-              minutes === p
-                ? "bg-neutral-900 text-white border-neutral-900"
-                : "bg-white border-neutral-200 hover:bg-neutral-50",
-              running ? "opacity-50 cursor-not-allowed" : "",
+              "glass-button text-sm",
+              minutes === p ? "glass-button-primary" : "glass-button-muted",
+              running ? "opacity-45 cursor-not-allowed" : "",
             ].join(" ")}
             disabled={running}
           >
@@ -138,34 +113,37 @@ export default function TimerCard({
           onChange={(e) => {
             const next = Math.max(1, Number(e.target.value));
             setMinutes(next);
+            setSecondsLeft(next * 60);
             onMinutesChange?.(next);
           }}
-          className="w-24 px-3 py-2 rounded-xl border border-neutral-200 text-sm font-semibold bg-white"
+          className="glass-input w-24 text-sm font-semibold"
           title="Minutos personalizados"
         />
       </div>
 
-      <div className="flex gap-2 mt-4">
+      <div className="flex gap-2 mt-5">
         {!running ? (
           <button
             onClick={() => {
               const durationSeconds = secondsLeft > 0 ? secondsLeft : minutes * 60;
-              if (secondsLeft <= 0) setSecondsLeft(durationSeconds);
+              setSecondsLeft(durationSeconds);
               endAtRef.current = Date.now() + durationSeconds * 1000;
               setRunning(true);
             }}
-            className="flex-1 rounded-xl px-4 py-3 bg-neutral-900 text-white font-semibold transition active:scale-[0.99]"
+            className="glass-button glass-button-primary flex-1 py-3"
           >
             Empezar
           </button>
         ) : (
           <button
             onClick={() => {
-              if (endAtRef.current) setSecondsLeft(getRemainingSeconds(endAtRef.current));
+              if (endAtRef.current) {
+                setSecondsLeft(getRemainingSeconds(endAtRef.current));
+              }
               endAtRef.current = null;
               setRunning(false);
             }}
-            className="flex-1 rounded-xl px-4 py-3 bg-white border border-neutral-200 font-semibold hover:bg-neutral-50 transition active:scale-[0.99]"
+            className="glass-button glass-button-muted flex-1 py-3"
           >
             Pausar
           </button>
@@ -177,7 +155,7 @@ export default function TimerCard({
             endAtRef.current = null;
             setSecondsLeft(minutes * 60);
           }}
-          className="rounded-xl px-4 py-3 bg-white border border-neutral-200 font-semibold hover:bg-neutral-50 transition active:scale-[0.99]"
+          className="glass-button glass-button-muted py-3"
         >
           Reset
         </button>

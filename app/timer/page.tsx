@@ -1,28 +1,21 @@
 "use client";
 
-import TimerCard from "@/components/TimerCard";
-import { setMinutes, upsertDay } from "@/lib/storage/sessions";
-import { toDayString } from "@/lib/dates";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import TimerCard from "@/components/TimerCard";
+import TimeBackground from "@/components/TimeBackground";
+import { toDayString } from "@/lib/dates";
+import { setMinutes, upsertDay } from "@/lib/storage/sessions";
+import { useState } from "react";
 
 export default function TimerPage() {
   const router = useRouter();
   const [selectedMinutes, setSelectedMinutes] = useState(10);
 
-  const [isNight, setIsNight] = useState(false);
-
-    useEffect(() => {
-      const h = new Date().getHours();
-      setIsNight(h >= 20 || h < 7);
-    }, []);
-
-
   function onFinish() {
     const today = toDayString(new Date());
     const now = Date.now();
 
-    // guardamos minutos + completado=true en una sola escritura (sin toggles)
     setMinutes(today, selectedMinutes);
     upsertDay({
       day: today,
@@ -35,23 +28,29 @@ export default function TimerPage() {
   }
 
   return (
-    <main className={`min-h-screen p-4 ${isNight ? "bg-night" : "bg-day"}`}>
-      <div className="max-w-md mx-auto space-y-4">
-        <a href="/" className="text-sm underline text-neutral-700">
-          ← Volver
-        </a>
+    <>
+      <TimeBackground />
+      <main className="app-shell">
+        <div className="app-frame soft-reveal">
+          <div className="glass-panel p-4">
+            <div className="flex items-center justify-between">
+              <Link href="/" className="glass-button glass-button-muted">
+                ← Volver
+              </Link>
+              <div className="glass-chip">Sesión</div>
+            </div>
 
-        <div className="text-2xl font-bold tracking-tight">Cronómetro</div>
+            <div className="glass-title text-3xl font-semibold mt-4">Cronómetro</div>
+            <div className="text-sm muted mt-1">Silencio guiado por tiempo real, incluso en segundo plano.</div>
+          </div>
 
-        <TimerCard
-          onFinish={onFinish}
-          onMinutesChange={(m) => setSelectedMinutes(m)}
-        />
+          <TimerCard onFinish={onFinish} onMinutesChange={(m) => setSelectedMinutes(m)} />
 
-        <div className="text-xs text-neutral-500">
-          Al terminar, marca “hoy” como meditado y vuelve al inicio.
+          <div className="glass-panel p-4 text-sm muted">
+            Al terminar, se marcará “hoy” como meditado y volverás al inicio.
+          </div>
         </div>
-      </div>
-    </main>
+      </main>
+    </>
   );
 }

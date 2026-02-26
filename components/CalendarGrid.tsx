@@ -33,23 +33,23 @@ export default function CalendarGrid({
   const monthLabel = formatMonthYear(monthDate);
 
   return (
-    <div className="rounded-2xl p-4 bg-white/80 shadow-sm border border-neutral-200">
+    <div className="glass-panel p-4">
       <div className="flex items-center justify-between mb-3">
-        <div className="font-semibold capitalize">{monthLabel}</div>
-        <div className="text-xs text-neutral-500">Toca para marcar</div>
+        <div className="font-semibold capitalize glass-title text-lg">{monthLabel}</div>
+        <div className="text-xs muted">Toca para marcar</div>
       </div>
 
-      <div className="grid grid-cols-7 gap-2 text-xs text-neutral-500 mb-2 select-none">
+      <div className="grid grid-cols-7 gap-1.5 text-[11px] muted mb-2 select-none">
         {["L", "M", "X", "J", "V", "S", "D"].map((x) => (
-          <div key={x} className="text-center">
+          <div key={x} className="text-center font-medium">
             {x}
           </div>
         ))}
       </div>
 
-      <div className="grid grid-cols-7 gap-2">
+      <div className="grid grid-cols-7 gap-1.5">
         {cells.map((day, idx) => {
-          if (!day) return <div key={idx} />;
+          if (!day) return <div key={idx} className="h-10" />;
 
           const rec = map.get(day);
           const completed = rec?.completed ?? false;
@@ -60,12 +60,12 @@ export default function CalendarGrid({
               key={day}
               onClick={() => onDayClick(day)}
               className={[
-                "h-10 rounded-xl border text-sm font-semibold",
-                "transition active:scale-[0.98]",
+                "h-10 rounded-xl text-sm font-semibold tabular-nums",
+                "transition duration-200 active:scale-[0.98]",
                 completed
-                  ? "bg-neutral-900 text-white border-neutral-900"
-                  : "bg-white text-neutral-900 border-neutral-200 hover:bg-neutral-50",
-                isToday ? "ring-2 ring-blue-400 ring-offset-1" : "",
+                  ? "border border-white/60 bg-white/32 shadow-[0_8px_18px_rgba(10,22,46,0.22)]"
+                  : "border border-white/35 bg-white/12 hover:bg-white/20",
+                isToday ? "ring-2 ring-cyan-200/80" : "",
               ].join(" ")}
               title={day}
             >

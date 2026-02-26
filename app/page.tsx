@@ -30,6 +30,13 @@ export default function HomePage() {
   const [notice, setNotice] = useState<string | null>(null);
   const noticeTimeoutRef = useRef<number | null>(null);
   const swipeStartRef = useRef<{ x: number; y: number; at: number } | null>(null);
+  const navigatingRef = useRef(false);
+
+  function goToTimer() {
+    if (navigatingRef.current) return;
+    navigatingRef.current = true;
+    router.push("/timer");
+  }
 
   useEffect(() => {
     const refresh = () => {
@@ -76,6 +83,8 @@ export default function HomePage() {
   }
 
   function onTouchStart(e: TouchEvent<HTMLElement>) {
+    const target = e.target as HTMLElement | null;
+    if (target?.closest("button, a, input, textarea, select")) return;
     if (e.touches.length !== 1) return;
     const t = e.touches[0];
     swipeStartRef.current = {
@@ -100,7 +109,7 @@ export default function HomePage() {
     const isQuickEnough = elapsed <= 900;
 
     if (isLeftSwipe && isMostlyHorizontal && isQuickEnough) {
-      router.push("/timer");
+      goToTimer();
     }
   }
 
@@ -182,7 +191,7 @@ export default function HomePage() {
 
           <button
             type="button"
-            onClick={() => router.push("/timer")}
+            onClick={goToTimer}
             className="glass-button glass-button-primary block w-full text-center py-2.5"
           >
             Ir al cronómetro

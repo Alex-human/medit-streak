@@ -6,6 +6,7 @@ import { getTimePhase } from "@/lib/timePhase";
 export default function TimeBackground() {
   useEffect(() => {
     const syncPhase = () => {
+      if (document.visibilityState === "hidden") return;
       const phase = getTimePhase(new Date());
       document.documentElement.setAttribute("data-time-phase", phase);
     };

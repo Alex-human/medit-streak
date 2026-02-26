@@ -106,6 +106,7 @@ export default function TimerCard({
 
         <input
           type="number"
+          inputMode="numeric"
           min={1}
           max={180}
           value={minutes}
@@ -116,7 +117,7 @@ export default function TimerCard({
             setSecondsLeft(next * 60);
             onMinutesChange?.(next);
           }}
-          className="glass-input w-24 text-sm font-semibold"
+          className="glass-input w-24 text-base font-semibold"
           title="Minutos personalizados"
         />
       </div>

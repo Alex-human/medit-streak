@@ -21,11 +21,25 @@
   --phase-b: #c5f7ff;
   --phase-c: #ffeecf;
   --phase-d: #a9d2ff;
+  --cal-empty-bg: rgba(255, 255, 255, 0.16);
+  --cal-empty-hover-bg: rgba(255, 255, 255, 0.24);
+  --cal-empty-border: rgba(255, 255, 255, 0.36);
+  --cal-done-bg: rgba(18, 28, 45, 0.36);
+  --cal-done-border: rgba(225, 238, 255, 0.56);
+  --cal-done-text: #f5f8ff;
+  --cal-done-shadow: 0 10px 22px rgba(7, 18, 34, 0.3);
+  --cal-today-outline: rgba(255, 255, 255, 0.86);
+  --cal-today-shadow: 0 0 0 1px rgba(255, 255, 255, 0.45), 0 0 20px rgba(255, 255, 255, 0.35);
 }
 
 html,
 body {
   height: 100%;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 body {
@@ -186,6 +200,15 @@ html[data-time-phase="sunrise"] {
   --glass-border: rgba(255, 255, 255, 0.52);
   --glass-soft-border: rgba(255, 255, 255, 0.45);
   --glass-shadow: 0 18px 45px rgba(39, 28, 51, 0.2);
+  --cal-empty-bg: rgba(255, 255, 255, 0.2);
+  --cal-empty-hover-bg: rgba(255, 255, 255, 0.3);
+  --cal-empty-border: rgba(255, 255, 255, 0.5);
+  --cal-done-bg: rgba(56, 45, 78, 0.42);
+  --cal-done-border: rgba(245, 228, 255, 0.62);
+  --cal-done-text: #f7f2ff;
+  --cal-done-shadow: 0 12px 24px rgba(47, 28, 58, 0.34);
+  --cal-today-outline: rgba(255, 255, 255, 0.92);
+  --cal-today-shadow: 0 0 0 1px rgba(255, 255, 255, 0.48), 0 0 20px rgba(255, 244, 255, 0.35);
 }
 
 html[data-time-phase="day"] {
@@ -202,6 +225,15 @@ html[data-time-phase="day"] {
   --glass-border: rgba(255, 255, 255, 0.42);
   --glass-soft-border: rgba(255, 255, 255, 0.36);
   --glass-shadow: 0 18px 45px rgba(14, 31, 55, 0.18);
+  --cal-empty-bg: rgba(255, 255, 255, 0.14);
+  --cal-empty-hover-bg: rgba(255, 255, 255, 0.24);
+  --cal-empty-border: rgba(255, 255, 255, 0.34);
+  --cal-done-bg: rgba(20, 58, 94, 0.42);
+  --cal-done-border: rgba(210, 236, 255, 0.6);
+  --cal-done-text: #eef6ff;
+  --cal-done-shadow: 0 10px 22px rgba(9, 39, 69, 0.32);
+  --cal-today-outline: rgba(255, 255, 255, 0.9);
+  --cal-today-shadow: 0 0 0 1px rgba(255, 255, 255, 0.46), 0 0 18px rgba(231, 244, 255, 0.32);
 }
 
 html[data-time-phase="sunset"] {
@@ -218,6 +250,15 @@ html[data-time-phase="sunset"] {
   --glass-border: rgba(255, 255, 255, 0.55);
   --glass-soft-border: rgba(255, 255, 255, 0.48);
   --glass-shadow: 0 20px 48px rgba(50, 28, 43, 0.22);
+  --cal-empty-bg: rgba(255, 255, 255, 0.19);
+  --cal-empty-hover-bg: rgba(255, 255, 255, 0.28);
+  --cal-empty-border: rgba(255, 255, 255, 0.46);
+  --cal-done-bg: rgba(73, 36, 58, 0.45);
+  --cal-done-border: rgba(255, 222, 238, 0.62);
+  --cal-done-text: #fff0f7;
+  --cal-done-shadow: 0 12px 24px rgba(58, 28, 45, 0.34);
+  --cal-today-outline: rgba(255, 255, 255, 0.92);
+  --cal-today-shadow: 0 0 0 1px rgba(255, 255, 255, 0.48), 0 0 19px rgba(255, 236, 234, 0.34);
 }
 
 html[data-time-phase="night"] {
@@ -236,6 +277,15 @@ html[data-time-phase="night"] {
   --glass-soft-border: rgba(208, 230, 255, 0.24);
   --glass-shadow: 0 22px 52px rgba(4, 10, 22, 0.5);
   --primary-button: linear-gradient(145deg, rgba(189, 221, 255, 0.42), rgba(130, 175, 235, 0.22));
+  --cal-empty-bg: rgba(201, 224, 255, 0.08);
+  --cal-empty-hover-bg: rgba(201, 224, 255, 0.14);
+  --cal-empty-border: rgba(208, 230, 255, 0.24);
+  --cal-done-bg: rgba(9, 14, 29, 0.58);
+  --cal-done-border: rgba(201, 226, 255, 0.52);
+  --cal-done-text: #eaf4ff;
+  --cal-done-shadow: 0 12px 24px rgba(2, 7, 18, 0.5);
+  --cal-today-outline: rgba(225, 240, 255, 0.85);
+  --cal-today-shadow: 0 0 0 1px rgba(210, 232, 255, 0.42), 0 0 18px rgba(199, 225, 255, 0.26);
 }
 
 .app-shell {
@@ -324,6 +374,7 @@ html[data-time-phase="night"] {
   border: 1px solid rgba(255, 255, 255, 0.45);
   background: linear-gradient(145deg, rgba(255, 255, 255, 0.24), rgba(255, 255, 255, 0.1));
   color: var(--app-text);
+  font-size: 16px;
   border-radius: 0.95rem;
   padding: 0.62rem 0.86rem;
   backdrop-filter: blur(12px) saturate(120%);
@@ -360,6 +411,34 @@ html[data-time-phase="night"] {
   color: var(--icon-color);
   filter: var(--icon-shadow);
   opacity: 0.96;
+}
+
+.calendar-day {
+  border-radius: 0.5rem;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.calendar-day-empty {
+  background: var(--cal-empty-bg);
+  border: 1px solid var(--cal-empty-border);
+}
+
+.calendar-day-empty:hover {
+  background: var(--cal-empty-hover-bg);
+}
+
+.calendar-day-completed {
+  background: var(--cal-done-bg);
+  border: 1px solid var(--cal-done-border);
+  box-shadow: var(--cal-done-shadow);
+  color: var(--cal-done-text);
+}
+
+.calendar-day-today {
+  background: var(--cal-empty-bg);
+  border: 2px solid var(--cal-today-outline);
+  box-shadow: var(--cal-today-shadow);
 }
 
 .soft-reveal {

@@ -62,7 +62,8 @@ export default function CalendarGrid({
               className={[
                 "calendar-day h-9 text-xs font-semibold tabular-nums",
                 "transition duration-200 active:scale-[0.98]",
-                completed ? "calendar-day-completed" : isToday ? "calendar-day-today" : "calendar-day-empty",
+                completed ? "calendar-day-completed" : "calendar-day-empty",
+                isToday ? (completed ? "calendar-day-today-completed" : "calendar-day-today") : "",
               ].join(" ")}
               title={day}
             >

@@ -441,6 +441,13 @@ html[data-time-phase="night"] {
   box-shadow: var(--cal-today-shadow);
 }
 
+.calendar-day-today-completed {
+  background: var(--cal-done-bg);
+  border: 2px solid var(--cal-today-outline);
+  box-shadow: var(--cal-done-shadow), var(--cal-today-shadow);
+  color: var(--cal-done-text);
+}
+
 .soft-reveal {
   animation: softReveal 420ms ease both;
 }

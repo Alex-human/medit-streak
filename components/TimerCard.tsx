@@ -20,21 +20,84 @@ export default function TimerCard({
   const [minutes, setMinutes] = useState<number>(10);
   const [secondsLeft, setSecondsLeft] = useState<number>(minutes * 60);
   const [running, setRunning] = useState(false);
+
   const endAtRef = useRef<number | null>(null);
   const gongRef = useRef<HTMLAudioElement | null>(null);
-  const finishTimeoutRef = useRef<number | null>(null);
+  const finishCalledRef = useRef(false);
 
   const getRemainingSeconds = useCallback((endAt: number) => {
     return Math.max(0, Math.ceil((endAt - Date.now()) / 1000));
   }, []);
 
-  useEffect(() => {
-    return () => {
-      if (finishTimeoutRef.current !== null) {
-        window.clearTimeout(finishTimeoutRef.current);
+  // iOS/PWA: "desbloquea" el audio en un gesto del usuario (click/tap).
+  const unlockGong = useCallback(() => {
+    const gong = gongRef.current;
+    if (!gong) return;
+
+    try {
+      // Asegura que el elemento tiene el recurso listo
+      gong.load();
+
+      // Truco típico iOS: reproducir en mute dentro del gesto, pausar, y desmutear
+      gong.muted = true;
+      gong.currentTime = 0;
+
+      const p = gong.play();
+      if (p && typeof (p as Promise<void>).then === "function") {
+        void (p as Promise<void>)
+          .then(() => {
+            gong.pause();
+            gong.currentTime = 0;
+            gong.muted = false;
+          })
+          .catch(() => {
+            gong.muted = false;
+          });
+      } else {
+        gong.pause();
+        gong.currentTime = 0;
+        gong.muted = false;
       }
-    };
+    } catch {
+      // no-op
+    }
   }, []);
+
+  const completeFinish = useCallback(() => {
+    if (finishCalledRef.current) return;
+    finishCalledRef.current = true;
+    onFinish?.();
+  }, [onFinish]);
+
+  const playGongAndFinish = useCallback(() => {
+    const gong = gongRef.current;
+    if (!gong) {
+      completeFinish();
+      return;
+    }
+
+    finishCalledRef.current = false;
+
+    try {
+      gong.currentTime = 0;
+
+      const onEnded = () => {
+        gong.removeEventListener("ended", onEnded);
+        completeFinish();
+      };
+      gong.addEventListener("ended", onEnded);
+
+      const p = gong.play();
+      if (p && typeof (p as Promise<void>).catch === "function") {
+        void (p as Promise<void>).catch(() => {
+          gong.removeEventListener("ended", onEnded);
+          completeFinish();
+        });
+      }
+    } catch {
+      completeFinish();
+    }
+  }, [completeFinish]);
 
   useEffect(() => {
     if (!running) return;
@@ -49,45 +112,22 @@ export default function TimerCard({
       if (next === 0) {
         setRunning(false);
         endAtRef.current = null;
-
-        const gong = gongRef.current;
-        const completeFinish = () => {
-          if (finishTimeoutRef.current !== null) {
-            window.clearTimeout(finishTimeoutRef.current);
-            finishTimeoutRef.current = null;
-          }
-          onFinish?.();
-        };
-
-        if (gong) {
-          gong.currentTime = 0;
-          const maybePromise = gong.play();
-          if (maybePromise && typeof maybePromise.catch === "function") {
-            void maybePromise.catch(() => {
-              // No-op when autoplay policies block sound.
-              completeFinish();
-            });
-          }
-          finishTimeoutRef.current = window.setTimeout(completeFinish, 1700);
-          return;
-        }
-
-        completeFinish();
+        playGongAndFinish();
       }
     };
 
-    const id = setInterval(tick, 250);
+    const id = window.setInterval(tick, 250);
     window.addEventListener("visibilitychange", tick);
     window.addEventListener("focus", tick);
     window.addEventListener("pageshow", tick);
 
     return () => {
-      clearInterval(id);
+      window.clearInterval(id);
       window.removeEventListener("visibilitychange", tick);
       window.removeEventListener("focus", tick);
       window.removeEventListener("pageshow", tick);
     };
-  }, [running, getRemainingSeconds, onFinish]);
+  }, [running, getRemainingSeconds, playGongAndFinish]);
 
   const label = useMemo(() => formatSeconds(secondsLeft), [secondsLeft]);
 
@@ -96,12 +136,22 @@ export default function TimerCard({
       <audio ref={gongRef} src="/sounds/gong.mp3" preload="auto" />
 
       <div className="flex items-center justify-center mb-4">
-        <div className={running ? "anim-floaty text-6xl select-none ui-icon" : "text-6xl select-none ui-icon"}>🧘‍♂️</div>
+        <div
+          className={
+            running
+              ? "anim-floaty text-6xl select-none ui-icon"
+              : "text-6xl select-none ui-icon"
+          }
+        >
+          🧘‍♂️
+        </div>
       </div>
 
       <div className="flex items-center justify-between">
         <div className="text-sm muted">Cronómetro</div>
-        <div className="glass-title text-4xl font-semibold tabular-nums">{label}</div>
+        <div className="glass-title text-4xl font-semibold tabular-nums">
+          {label}
+        </div>
       </div>
 
       <div className="flex gap-2 mt-4 flex-wrap">
@@ -147,7 +197,12 @@ export default function TimerCard({
         {!running ? (
           <button
             onClick={() => {
-              const durationSeconds = secondsLeft > 0 ? secondsLeft : minutes * 60;
+              // IMPORTANTE: desbloquea audio en el gesto del usuario (iOS/PWA)
+              unlockGong();
+
+              finishCalledRef.current = false;
+              const durationSeconds =
+                secondsLeft > 0 ? secondsLeft : minutes * 60;
               setSecondsLeft(durationSeconds);
               endAtRef.current = Date.now() + durationSeconds * 1000;
               setRunning(true);

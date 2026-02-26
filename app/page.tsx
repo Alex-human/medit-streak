@@ -62,13 +62,13 @@ export default function HomePage() {
   return (
     <>
       <TimeBackground />
-      <main className="app-shell">
-        <div className="app-frame soft-reveal">
-          <div className="glass-panel p-4">
+      <main className="app-shell app-shell-fit">
+        <div className="app-frame app-frame-fit soft-reveal">
+          <div className="glass-panel p-3">
             <div className="flex items-end justify-between gap-2">
               <div>
-                <div className="glass-title text-3xl font-semibold">Medit Streak</div>
-                <div className="text-sm muted mt-1">Respira, vuelve al presente, y suma continuidad.</div>
+                <div className="glass-title text-2xl font-semibold">Medit Streak</div>
+                <div className="text-xs muted mt-1">Respira, vuelve al presente, y suma continuidad.</div>
               </div>
               <div className="glass-chip">Offline</div>
             </div>
@@ -76,26 +76,26 @@ export default function HomePage() {
 
           <StreakHeader streak={hydrated ? streak : 0} />
 
-          <div className="glass-panel p-4">
-            <div className="text-sm muted">Este mes</div>
-            <div className="mt-2 grid grid-cols-3 gap-2.5">
-              <div className="glass-panel-soft p-3">
+          <div className="glass-panel p-3">
+            <div className="text-xs muted">Este mes</div>
+            <div className="mt-2 grid grid-cols-3 gap-2">
+              <div className="glass-panel-soft p-2.5">
                 <div className="text-[11px] muted">Sesiones</div>
-                <div className="text-2xl font-semibold tabular-nums">{hydrated ? monthStats.sessions : 0}</div>
+                <div className="text-xl font-semibold tabular-nums">{hydrated ? monthStats.sessions : 0}</div>
               </div>
-              <div className="glass-panel-soft p-3">
+              <div className="glass-panel-soft p-2.5">
                 <div className="text-[11px] muted">Minutos</div>
-                <div className="text-2xl font-semibold tabular-nums">{hydrated ? monthStats.minutes : 0}</div>
+                <div className="text-xl font-semibold tabular-nums">{hydrated ? monthStats.minutes : 0}</div>
               </div>
-              <div className="glass-panel-soft p-3">
+              <div className="glass-panel-soft p-2.5">
                 <div className="text-[11px] muted">Media</div>
-                <div className="text-2xl font-semibold tabular-nums">{hydrated ? monthStats.avg : 0}</div>
+                <div className="text-xl font-semibold tabular-nums">{hydrated ? monthStats.avg : 0}</div>
                 <div className="text-[10px] muted">min/sesión</div>
               </div>
             </div>
           </div>
 
-          <div className="glass-panel p-2 flex items-center justify-between gap-2">
+          <div className="glass-panel p-1.5 flex items-center justify-between gap-1.5">
             <button
               type="button"
               onClick={() => setMonthDate((prev) => addMonths(prev, -1))}
@@ -122,13 +122,13 @@ export default function HomePage() {
           </div>
 
           {notice && (
-            <div className="glass-panel p-4">
+            <div className="glass-panel p-3">
               <div className="font-semibold">No se puede marcar manualmente</div>
-              <div className="text-sm muted mt-1">{notice}</div>
+              <div className="text-xs muted mt-1">{notice}</div>
               <button
                 type="button"
                 onClick={() => router.push("/timer")}
-                className="glass-button glass-button-primary mt-3"
+                className="glass-button glass-button-primary mt-2"
               >
                 Ir al cronómetro
               </button>
@@ -140,12 +140,12 @@ export default function HomePage() {
           <button
             type="button"
             onClick={() => router.push("/timer")}
-            className="glass-button glass-button-primary block w-full text-center py-3"
+            className="glass-button glass-button-primary block w-full text-center py-2.5"
           >
             Ir al cronómetro
           </button>
 
-          <div className="text-xs muted text-center">Para marcar “hoy”, completa el cronómetro.</div>
+          <div className="text-[11px] muted text-center">Para marcar “hoy”, completa el cronómetro.</div>
         </div>
       </main>
     </>

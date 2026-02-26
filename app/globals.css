@@ -6,8 +6,8 @@
 
 :root {
   color-scheme: light;
-  --app-text: #f5f5f5;
-  --muted-text: #ffffff;
+  --app-text: #333333;
+  --muted-text: #4a4a4a;
   --glass-bg: rgba(255, 255, 255, 0.18);
   --glass-bg-strong: rgba(255, 255, 255, 0.25);
   --glass-border: rgba(255, 255, 255, 0.45);
@@ -161,28 +161,28 @@ body {
   animation: waveSlide 17s ease-in-out infinite;
 }
 
-.time-phase-sunrise {
+html[data-time-phase="sunrise"] {
   --phase-a: #ffd7b5;
   --phase-b: #ffd9df;
   --phase-c: #ffefcf;
   --phase-d: #b8dcff;
 }
 
-.time-phase-day {
+html[data-time-phase="day"] {
   --phase-a: #8bc5ff;
   --phase-b: #b8ecff;
   --phase-c: #e8f8ff;
   --phase-d: #b3d8ff;
 }
 
-.time-phase-sunset {
+html[data-time-phase="sunset"] {
   --phase-a: #ffb88f;
   --phase-b: #ffc5ab;
   --phase-c: #ffd8c7;
   --phase-d: #9cc8ff;
 }
 
-.time-phase-night {
+html[data-time-phase="night"] {
   --phase-a: #132848;
   --phase-b: #1f3460;
   --phase-c: #2b3b6d;
@@ -200,12 +200,25 @@ body {
   padding: 1rem;
 }
 
+.app-shell-fit {
+  height: 100dvh;
+  min-height: 100dvh;
+  overflow: hidden;
+  padding-top: max(0.65rem, env(safe-area-inset-top));
+  padding-bottom: max(0.65rem, env(safe-area-inset-bottom));
+}
+
 .app-frame {
   max-width: 28rem;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
   gap: 0.95rem;
+}
+
+.app-frame-fit {
+  height: 100%;
+  gap: 0.55rem;
 }
 
 .glass-panel {
@@ -266,7 +279,7 @@ body {
 }
 
 .glass-input::placeholder {
-  color: #ffffff;
+  color: var(--muted-text);
 }
 
 .glass-chip {
@@ -311,7 +324,16 @@ body {
     padding: 0.75rem;
   }
 
+  .app-shell-fit {
+    padding-top: max(0.45rem, env(safe-area-inset-top));
+    padding-bottom: max(0.45rem, env(safe-area-inset-bottom));
+  }
+
   .app-frame {
     gap: 0.78rem;
+  }
+
+  .app-frame-fit {
+    gap: 0.48rem;
   }
 }

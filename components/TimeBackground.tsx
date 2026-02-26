@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { getTimePhase, type TimePhase } from "@/lib/timePhase";
+import { useEffect } from "react";
+import { getTimePhase } from "@/lib/timePhase";
 
 export default function TimeBackground() {
-  const [phase, setPhase] = useState<TimePhase>(() => getTimePhase(new Date()));
-
   useEffect(() => {
-    const syncPhase = () => setPhase(getTimePhase(new Date()));
+    const syncPhase = () => {
+      const phase = getTimePhase(new Date());
+      document.documentElement.setAttribute("data-time-phase", phase);
+    };
 
     syncPhase();
     const id = window.setInterval(syncPhase, 60_000);
@@ -22,7 +23,7 @@ export default function TimeBackground() {
   }, []);
 
   return (
-    <div className={`time-scene time-phase-${phase}`} aria-hidden="true">
+    <div className="time-scene" aria-hidden="true">
       <div className="time-gradient" />
       <div className="time-haze" />
       <div className="time-orb" />

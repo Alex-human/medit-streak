@@ -19,6 +19,21 @@ export default function RootLayout({
 }) {
   return (
     <html lang="es">
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                try {
+                  var h = new Date().getHours();
+                  var phase = (h >= 6 && h < 9) ? "sunrise" : (h >= 9 && h < 17) ? "day" : (h >= 17 && h < 20) ? "sunset" : "night";
+                  document.documentElement.setAttribute("data-time-phase", phase);
+                } catch (e) {}
+              })();
+            `,
+          }}
+        />
+      </head>
       <body>{children}</body>
     </html>
   );

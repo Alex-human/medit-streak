@@ -75,7 +75,7 @@ export default function TimerCard({
       <audio ref={gongRef} src="/sounds/gong.mp3" preload="auto" />
 
       <div className="flex items-center justify-center mb-4">
-        <div className={running ? "anim-floaty text-6xl select-none" : "text-6xl select-none"}>🧘‍♂️</div>
+        <div className={running ? "anim-floaty text-6xl select-none ui-icon" : "text-6xl select-none ui-icon"}>🧘‍♂️</div>
       </div>
 
       <div className="flex items-center justify-between">

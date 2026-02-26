@@ -4,7 +4,12 @@ export default function StreakHeader({ streak }: { streak: number }) {
       <div className="flex items-center justify-between gap-2">
         <div>
           <div className="text-xs muted">Racha actual</div>
-          <div className="glass-title text-3xl font-semibold tracking-tight mt-1 tabular-nums">🔥 {streak} días</div>
+          <div className="glass-title text-3xl font-semibold tracking-tight mt-1 tabular-nums">
+            <span className="ui-icon" aria-hidden="true">
+              🔥
+            </span>{" "}
+            {streak} días
+          </div>
         </div>
         <div className="glass-panel-soft px-2.5 py-1.5 text-[11px] muted">Consistencia</div>
       </div>

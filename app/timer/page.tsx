@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import TimerCard from "@/components/TimerCard";
 import TimeBackground from "@/components/TimeBackground";
 import { toDayString } from "@/lib/dates";
-import { setMinutes, upsertDay } from "@/lib/storage/sessions";
+import { upsertDay } from "@/lib/storage/sessions";
 import { useState } from "react";
 
 export default function TimerPage() {
@@ -14,14 +14,11 @@ export default function TimerPage() {
 
   function onFinish() {
     const today = toDayString(new Date());
-    const now = Date.now();
-
-    setMinutes(today, selectedMinutes);
     upsertDay({
       day: today,
       minutes: selectedMinutes,
       completed: true,
-      updatedAt: now,
+      updatedAt: Date.now(),
     });
 
     router.push("/");
@@ -35,7 +32,10 @@ export default function TimerPage() {
           <div className="glass-panel p-4">
             <div className="flex items-center justify-between">
               <Link href="/" className="glass-button glass-button-muted">
-                ← Volver
+                <span className="ui-icon" aria-hidden="true">
+                  ←
+                </span>{" "}
+                Volver
               </Link>
               <div className="glass-chip">Sesión</div>
             </div>

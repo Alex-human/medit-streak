@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type TouchEvent } from "react";
 import CalendarGrid from "@/components/CalendarGrid";
 import StreakHeader from "@/components/StreakHeader";
 import TimeBackground from "@/components/TimeBackground";
@@ -28,6 +28,8 @@ export default function HomePage() {
   const [records, setRecords] = useState<DayRecord[]>([]);
   const [hydrated, setHydrated] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const noticeTimeoutRef = useRef<number | null>(null);
+  const swipeStartRef = useRef<{ x: number; y: number; at: number } | null>(null);
 
   useEffect(() => {
     const refresh = () => {
@@ -38,6 +40,14 @@ export default function HomePage() {
     refresh();
     window.addEventListener("focus", refresh);
     return () => window.removeEventListener("focus", refresh);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (noticeTimeoutRef.current !== null) {
+        window.clearTimeout(noticeTimeoutRef.current);
+      }
+    };
   }, []);
 
   const streak = useMemo(() => computeStreak(records), [records]);
@@ -56,13 +66,48 @@ export default function HomePage() {
 
   function onDayClick() {
     setNotice("Para marcar un día, usa el cronómetro y termina la sesión.");
-    window.setTimeout(() => setNotice(null), 2500);
+    if (noticeTimeoutRef.current !== null) {
+      window.clearTimeout(noticeTimeoutRef.current);
+    }
+    noticeTimeoutRef.current = window.setTimeout(() => {
+      setNotice(null);
+      noticeTimeoutRef.current = null;
+    }, 2500);
+  }
+
+  function onTouchStart(e: TouchEvent<HTMLElement>) {
+    if (e.touches.length !== 1) return;
+    const t = e.touches[0];
+    swipeStartRef.current = {
+      x: t.clientX,
+      y: t.clientY,
+      at: Date.now(),
+    };
+  }
+
+  function onTouchEnd(e: TouchEvent<HTMLElement>) {
+    const start = swipeStartRef.current;
+    swipeStartRef.current = null;
+    if (!start || e.changedTouches.length === 0) return;
+
+    const end = e.changedTouches[0];
+    const dx = end.clientX - start.x;
+    const dy = end.clientY - start.y;
+    const elapsed = Date.now() - start.at;
+
+    const isLeftSwipe = dx <= -72;
+    const isMostlyHorizontal = Math.abs(dx) > Math.abs(dy) * 1.2;
+    const isQuickEnough = elapsed <= 900;
+
+    if (isLeftSwipe && isMostlyHorizontal && isQuickEnough) {
+      router.push("/timer");
+    }
   }
 
   return (
     <>
       <TimeBackground />
-      <main className="app-shell app-shell-fit">
+      <main className="app-shell app-shell-fit touch-pan-y" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
         <div className="app-frame app-frame-fit soft-reveal">
           <div className="glass-panel p-3">
             <div className="flex items-end justify-between gap-2">
@@ -102,7 +147,9 @@ export default function HomePage() {
               className="glass-button glass-button-muted"
               aria-label="Mes anterior"
             >
-              ←
+              <span className="ui-icon" aria-hidden="true">
+                ←
+              </span>
             </button>
             <button
               type="button"
@@ -117,7 +164,9 @@ export default function HomePage() {
               className="glass-button glass-button-muted"
               aria-label="Mes siguiente"
             >
-              →
+              <span className="ui-icon" aria-hidden="true">
+                →
+              </span>
             </button>
           </div>
 
@@ -125,27 +174,15 @@ export default function HomePage() {
             <div className="glass-panel p-3">
               <div className="font-semibold">No se puede marcar manualmente</div>
               <div className="text-xs muted mt-1">{notice}</div>
-              <button
-                type="button"
-                onClick={() => router.push("/timer")}
-                className="glass-button glass-button-primary mt-2"
-              >
-                Ir al cronómetro
-              </button>
+              <div className="text-[11px] muted mt-2">Desliza de derecha a izquierda para ir al cronómetro.</div>
             </div>
           )}
 
           <CalendarGrid monthDate={monthDate} records={hydrated ? records : []} onDayClick={onDayClick} />
 
-          <button
-            type="button"
-            onClick={() => router.push("/timer")}
-            className="glass-button glass-button-primary block w-full text-center py-2.5"
-          >
-            Ir al cronómetro
-          </button>
-
-          <div className="text-[11px] muted text-center">Para marcar “hoy”, completa el cronómetro.</div>
+          <div className="glass-panel-soft px-3 py-2 text-[11px] muted text-center">
+            Desliza de derecha a izquierda para abrir el cronómetro.
+          </div>
         </div>
       </main>
     </>

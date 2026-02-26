@@ -242,8 +242,8 @@ html[data-time-phase="night"] {
   height: 100dvh;
   min-height: 100dvh;
   overflow: hidden;
-  padding-top: max(0.65rem, env(safe-area-inset-top));
-  padding-bottom: max(0.65rem, env(safe-area-inset-bottom));
+  padding-top: max(0.75rem, env(safe-area-inset-top));
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
 }
 
 .app-frame {
@@ -256,7 +256,7 @@ html[data-time-phase="night"] {
 
 .app-frame-fit {
   height: 100%;
-  gap: 0.55rem;
+  gap: 0.65rem;
 }
 
 .glass-panel {
@@ -369,8 +369,8 @@ html[data-time-phase="night"] {
   }
 
   .app-shell-fit {
-    padding-top: max(0.45rem, env(safe-area-inset-top));
-    padding-bottom: max(0.45rem, env(safe-area-inset-bottom));
+    padding-top: max(0.55rem, env(safe-area-inset-top));
+    padding-bottom: max(0.55rem, env(safe-area-inset-bottom));
   }
 
   .app-frame {
@@ -378,6 +378,6 @@ html[data-time-phase="night"] {
   }
 
   .app-frame-fit {
-    gap: 0.48rem;
+    gap: 0.56rem;
   }
 }

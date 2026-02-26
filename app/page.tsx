@@ -180,6 +180,14 @@ export default function HomePage() {
 
           <CalendarGrid monthDate={monthDate} records={hydrated ? records : []} onDayClick={onDayClick} />
 
+          <button
+            type="button"
+            onClick={() => router.push("/timer")}
+            className="glass-button glass-button-primary block w-full text-center py-2.5"
+          >
+            Ir al cronómetro
+          </button>
+
           <div className="glass-panel-soft px-3 py-2 text-[11px] muted text-center">
             Desliza de derecha a izquierda para abrir el cronómetro.
           </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 const PRESETS = [5, 10, 15, 20];
 
@@ -20,22 +20,55 @@ export default function TimerCard({
   const [minutes, setMinutes] = useState<number>(10);
   const [secondsLeft, setSecondsLeft] = useState<number>(minutes * 60);
   const [running, setRunning] = useState(false);
+  const endAtRef = useRef<number | null>(null);
+
+  const getRemainingSeconds = useCallback((endAt: number) => {
+    return Math.max(0, Math.ceil((endAt - Date.now()) / 1000));
+  }, []);
+
+  const syncRemainingFromClock = useCallback(() => {
+    const endAt = endAtRef.current;
+    if (!endAt) return;
+    setSecondsLeft(getRemainingSeconds(endAt));
+  }, [getRemainingSeconds]);
 
   useEffect(() => {
-    if (!running) setSecondsLeft(minutes * 60);
-  }, [minutes, running]);
+    if (!running) {
+      endAtRef.current = null;
+      setSecondsLeft(minutes * 60);
+    }
+  }, [minutes]);
 
   useEffect(() => {
     if (!running) return;
-    if (secondsLeft <= 0) return;
+    if (secondsLeft <= 0) {
+      setRunning(false);
+      return;
+    }
 
-    const id = setInterval(() => setSecondsLeft((prev) => prev - 1), 1000);
-    return () => clearInterval(id);
-  }, [running, secondsLeft]);
+    if (!endAtRef.current) {
+      endAtRef.current = Date.now() + secondsLeft * 1000;
+    }
+
+    syncRemainingFromClock();
+    const id = setInterval(syncRemainingFromClock, 250);
+    const onVisibilityOrFocus = () => syncRemainingFromClock();
+    window.addEventListener("visibilitychange", onVisibilityOrFocus);
+    window.addEventListener("focus", onVisibilityOrFocus);
+    window.addEventListener("pageshow", onVisibilityOrFocus);
+
+    return () => {
+      clearInterval(id);
+      window.removeEventListener("visibilitychange", onVisibilityOrFocus);
+      window.removeEventListener("focus", onVisibilityOrFocus);
+      window.removeEventListener("pageshow", onVisibilityOrFocus);
+    };
+  }, [running, secondsLeft, syncRemainingFromClock]);
 
   useEffect(() => {
     if (running && secondsLeft === 0) {
       setRunning(false);
+      endAtRef.current = null;
 
       // sonar gong (si falla por restricciones del navegador, no rompe)
       const gong = gongRef.current;
@@ -115,14 +148,23 @@ export default function TimerCard({
       <div className="flex gap-2 mt-4">
         {!running ? (
           <button
-            onClick={() => setRunning(true)}
+            onClick={() => {
+              const durationSeconds = secondsLeft > 0 ? secondsLeft : minutes * 60;
+              if (secondsLeft <= 0) setSecondsLeft(durationSeconds);
+              endAtRef.current = Date.now() + durationSeconds * 1000;
+              setRunning(true);
+            }}
             className="flex-1 rounded-xl px-4 py-3 bg-neutral-900 text-white font-semibold transition active:scale-[0.99]"
           >
             Empezar
           </button>
         ) : (
           <button
-            onClick={() => setRunning(false)}
+            onClick={() => {
+              if (endAtRef.current) setSecondsLeft(getRemainingSeconds(endAtRef.current));
+              endAtRef.current = null;
+              setRunning(false);
+            }}
             className="flex-1 rounded-xl px-4 py-3 bg-white border border-neutral-200 font-semibold hover:bg-neutral-50 transition active:scale-[0.99]"
           >
             Pausar
@@ -132,6 +174,7 @@ export default function TimerCard({
         <button
           onClick={() => {
             setRunning(false);
+            endAtRef.current = null;
             setSecondsLeft(minutes * 60);
           }}
           className="rounded-xl px-4 py-3 bg-white border border-neutral-200 font-semibold hover:bg-neutral-50 transition active:scale-[0.99]"

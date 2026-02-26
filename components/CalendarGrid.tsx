@@ -1,5 +1,6 @@
 import {
   daysInMonth,
+  formatMonthYear,
   startOfMonth,
   weekdayIndexMondayFirst,
   toDayString,
@@ -29,10 +30,7 @@ export default function CalendarGrid({
     cells.push(toDayString(date));
   }
 
-  const monthLabel = monthDate.toLocaleString(undefined, {
-    month: "long",
-    year: "numeric",
-  });
+  const monthLabel = formatMonthYear(monthDate);
 
   return (
     <div className="rounded-2xl p-4 bg-white/80 shadow-sm border border-neutral-200">

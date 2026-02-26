@@ -20,9 +20,7 @@ export default function TimerPage() {
       completed: true,
       updatedAt: Date.now(),
     });
-    window.setTimeout(() => {
-      router.push("/");
-    }, 550);
+    router.push("/");
   }
 
   return (

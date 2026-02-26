@@ -23,6 +23,7 @@ export default function TimerCard({
   const endAtRef = useRef<number | null>(null);
   const gongRef = useRef<HTMLAudioElement | null>(null);
   const gongUnlockedRef = useRef(false);
+  const finishTimeoutRef = useRef<number | null>(null);
 
   const primeGongForPlayback = useCallback(() => {
     const gong = gongRef.current;
@@ -62,6 +63,14 @@ export default function TimerCard({
   }, []);
 
   useEffect(() => {
+    return () => {
+      if (finishTimeoutRef.current !== null) {
+        window.clearTimeout(finishTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
     if (!running) return;
 
     const tick = () => {
@@ -76,17 +85,28 @@ export default function TimerCard({
         endAtRef.current = null;
 
         const gong = gongRef.current;
+        const completeFinish = () => {
+          if (finishTimeoutRef.current !== null) {
+            window.clearTimeout(finishTimeoutRef.current);
+            finishTimeoutRef.current = null;
+          }
+          onFinish?.();
+        };
+
         if (gong) {
           gong.currentTime = 0;
           const maybePromise = gong.play();
           if (maybePromise && typeof maybePromise.catch === "function") {
             void maybePromise.catch(() => {
               // No-op when autoplay policies block sound.
+              completeFinish();
             });
           }
+          finishTimeoutRef.current = window.setTimeout(completeFinish, 1700);
+          return;
         }
 
-        onFinish?.();
+        completeFinish();
       }
     };
 

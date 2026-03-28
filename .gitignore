@@ -17,6 +17,14 @@
 /.next/
 /out/
 
+# capacitor / ios generated assets
+/ios/App/App/public/
+/ios/App/App/capacitor.config.json
+/ios/App/CapApp-SPM/.build/
+/ios/App/CapApp-SPM/.swiftpm/
+/ios/App/App.xcodeproj/project.xcworkspace/xcshareddata/
+/ios/App/App.xcodeproj/xcuserdata/
+
 # production
 /build
 

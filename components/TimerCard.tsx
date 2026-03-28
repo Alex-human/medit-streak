@@ -49,7 +49,9 @@ export default function TimerCard({
     loadingBufferRef.current = (async () => {
       // 1) AudioContext
       if (!audioCtxRef.current) {
-        const Ctx = window.AudioContext || (window as any).webkitAudioContext;
+        const Ctx =
+          window.AudioContext ||
+          (window as Window & typeof globalThis & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
         audioCtxRef.current = new Ctx();
       }
 

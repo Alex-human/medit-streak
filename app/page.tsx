@@ -48,14 +48,20 @@ export default function HomePage() {
   }
 
   useEffect(() => {
-    const refresh = () => {
-      setRecords(getAllDays());
+    let active = true;
+    const refresh = async () => {
+      const next = await getAllDays();
+      if (!active) return;
+      setRecords(next);
       setHydrated(true);
     };
 
-    refresh();
+    void refresh();
     window.addEventListener("focus", refresh);
-    return () => window.removeEventListener("focus", refresh);
+    return () => {
+      active = false;
+      window.removeEventListener("focus", refresh);
+    };
   }, []);
 
   const streak = useMemo(() => computeStreak(records), [records]);
@@ -98,9 +104,9 @@ export default function HomePage() {
     };
   }, [detailDay, records]);
 
-  function onDayClick(day: string) {
-    toggleComplete(day, defaultMinutes);
-    setRecords(getAllDays());
+  async function onDayClick(day: string) {
+    await toggleComplete(day, defaultMinutes);
+    setRecords(await getAllDays());
   }
 
   function onDayLongPress(day: string) {

@@ -12,9 +12,9 @@ export default function TimerPage() {
   const router = useRouter();
   const [selectedMinutes, setSelectedMinutes] = useState(10);
 
-  function onFinish() {
+  async function onFinish() {
     const today = toDayString(new Date());
-    upsertDay({
+    await upsertDay({
       day: today,
       minutes: selectedMinutes,
       completed: true,

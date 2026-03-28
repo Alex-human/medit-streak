@@ -5,7 +5,7 @@ import CalendarGrid from "@/components/CalendarGrid";
 import StreakHeader from "@/components/StreakHeader";
 import TimeBackground from "@/components/TimeBackground";
 import { computeStreak } from "@/lib/streak";
-import { getAllDays, type DayRecord } from "@/lib/storage/sessions";
+import { getAllDays, toggleComplete, type DayRecord } from "@/lib/storage/sessions";
 import { useRouter } from "next/navigation";
 
 function startOfMonthLocal(d: Date) {
@@ -22,13 +22,22 @@ function monthKey(d: Date) {
   return `${y}-${m}`;
 }
 
+function formatDayLabel(day: string) {
+  const [year, month, date] = day.split("-").map(Number);
+  return new Intl.DateTimeFormat("es-ES", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).format(new Date(year, month - 1, date));
+}
+
 export default function HomePage() {
   const router = useRouter();
   const [monthDate, setMonthDate] = useState<Date>(() => startOfMonthLocal(new Date()));
   const [records, setRecords] = useState<DayRecord[]>([]);
   const [hydrated, setHydrated] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
-  const noticeTimeoutRef = useRef<number | null>(null);
+  const [detailDay, setDetailDay] = useState<string | null>(null);
   const swipeStartRef = useRef<{ x: number; y: number; at: number } | null>(null);
   const navigatingRef = useRef(false);
 
@@ -49,14 +58,6 @@ export default function HomePage() {
     return () => window.removeEventListener("focus", refresh);
   }, []);
 
-  useEffect(() => {
-    return () => {
-      if (noticeTimeoutRef.current !== null) {
-        window.clearTimeout(noticeTimeoutRef.current);
-      }
-    };
-  }, []);
-
   const streak = useMemo(() => computeStreak(records), [records]);
 
   const monthStats = useMemo(() => {
@@ -71,15 +72,39 @@ export default function HomePage() {
     return { sessions, minutes, avg };
   }, [records, monthDate]);
 
-  function onDayClick() {
-    setNotice("Para marcar un día, usa el cronómetro y termina la sesión.");
-    if (noticeTimeoutRef.current !== null) {
-      window.clearTimeout(noticeTimeoutRef.current);
-    }
-    noticeTimeoutRef.current = window.setTimeout(() => {
-      setNotice(null);
-      noticeTimeoutRef.current = null;
-    }, 2500);
+  const defaultMinutes = useMemo(() => {
+    const latestCompleted = [...records]
+      .filter((record) => record.completed && record.minutes > 0)
+      .sort((a, b) => b.updatedAt - a.updatedAt)[0];
+
+    return latestCompleted?.minutes ?? 10;
+  }, [records]);
+
+  const detailStats = useMemo(() => {
+    if (!detailDay) return null;
+
+    const selectedRecord = records.find((record) => record.day === detailDay);
+    const selectedMonth = detailDay.slice(0, 7);
+    const monthCompleted = records.filter((record) => record.completed && record.day.startsWith(selectedMonth));
+    const monthMinutes = monthCompleted.reduce((acc, record) => acc + (record.minutes || 0), 0);
+    const monthAverage = monthCompleted.length > 0 ? Math.round(monthMinutes / monthCompleted.length) : 0;
+
+    return {
+      day: detailDay,
+      label: formatDayLabel(detailDay),
+      completed: selectedRecord?.completed ?? false,
+      dayMinutes: selectedRecord?.completed ? selectedRecord.minutes : 0,
+      monthAverage,
+    };
+  }, [detailDay, records]);
+
+  function onDayClick(day: string) {
+    toggleComplete(day, defaultMinutes);
+    setRecords(getAllDays());
+  }
+
+  function onDayLongPress(day: string) {
+    setDetailDay(day);
   }
 
   function onTouchStart(e: TouchEvent<HTMLElement>) {
@@ -179,15 +204,12 @@ export default function HomePage() {
             </button>
           </div>
 
-          {notice && (
-            <div className="glass-panel p-3">
-              <div className="font-semibold">No se puede marcar manualmente</div>
-              <div className="text-xs muted mt-1">{notice}</div>
-              <div className="text-[11px] muted mt-2">Desliza de derecha a izquierda para ir al cronómetro.</div>
-            </div>
-          )}
-
-          <CalendarGrid monthDate={monthDate} records={hydrated ? records : []} onDayClick={onDayClick} />
+          <CalendarGrid
+            monthDate={monthDate}
+            records={hydrated ? records : []}
+            onDayClick={onDayClick}
+            onDayLongPress={onDayLongPress}
+          />
 
           <button
             type="button"
@@ -202,6 +224,44 @@ export default function HomePage() {
           </div>
         </div>
       </main>
+
+      {detailStats && (
+        <div
+          className="fixed inset-0 z-20 flex items-center justify-center px-4"
+          onClick={() => setDetailDay(null)}
+          role="presentation"
+        >
+          <div className="absolute inset-0 bg-[rgba(7,14,28,0.12)] backdrop-blur-[3px]" />
+          <div
+            className="relative w-full max-w-sm glass-popover p-4 soft-reveal"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Detalle del ${detailStats.label}`}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="text-xs muted">Detalle del día</div>
+                <div className="glass-title text-xl font-semibold capitalize mt-1">{detailStats.label}</div>
+              </div>
+              <div className="glass-chip">{detailStats.completed ? "Completado" : "Sin marcar"}</div>
+            </div>
+
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <div className="glass-panel-soft p-3">
+                <div className="text-[11px] muted">Meditaste</div>
+                <div className="text-2xl font-semibold tabular-nums mt-1">{detailStats.dayMinutes} min</div>
+              </div>
+              <div className="glass-panel-soft p-3">
+                <div className="text-[11px] muted">Media del mes</div>
+                <div className="text-2xl font-semibold tabular-nums mt-1">{detailStats.monthAverage} min</div>
+              </div>
+            </div>
+
+            <div className="text-[11px] muted mt-3">Toca cualquier parte fuera de esta ventana para cerrarla.</div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

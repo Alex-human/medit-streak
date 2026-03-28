@@ -339,6 +339,15 @@ html[data-time-phase="night"] {
   -webkit-backdrop-filter: blur(14px) saturate(130%);
 }
 
+.glass-popover {
+  background: linear-gradient(145deg, color-mix(in srgb, var(--glass-bg-strong) 92%, transparent), color-mix(in srgb, var(--glass-bg) 88%, transparent));
+  border: 1px solid color-mix(in srgb, var(--glass-border) 88%, rgba(255, 255, 255, 0.12));
+  border-radius: 1.4rem;
+  backdrop-filter: blur(26px) saturate(145%);
+  -webkit-backdrop-filter: blur(26px) saturate(145%);
+  box-shadow: 0 24px 56px rgba(6, 20, 43, 0.3);
+}
+
 .glass-button {
   border: 1px solid rgba(255, 255, 255, 0.48);
   border-radius: 0.95rem;

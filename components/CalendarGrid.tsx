@@ -1,3 +1,6 @@
+"use client";
+
+import { useRef } from "react";
 import {
   daysInMonth,
   formatMonthYear,
@@ -11,11 +14,15 @@ export default function CalendarGrid({
   monthDate,
   records,
   onDayClick,
+  onDayLongPress,
 }: {
   monthDate: Date;
   records: DayRecord[];
   onDayClick: (day: string) => void;
+  onDayLongPress: (day: string) => void;
 }) {
+  const longPressTimeoutRef = useRef<number | null>(null);
+  const longPressTriggeredRef = useRef(false);
   const map = new Map(records.map((r) => [r.day, r]));
   const first = startOfMonth(monthDate);
   const total = daysInMonth(monthDate);
@@ -32,11 +39,27 @@ export default function CalendarGrid({
 
   const monthLabel = formatMonthYear(monthDate);
 
+  function clearLongPress() {
+    if (longPressTimeoutRef.current !== null) {
+      window.clearTimeout(longPressTimeoutRef.current);
+      longPressTimeoutRef.current = null;
+    }
+  }
+
+  function startLongPress(day: string) {
+    clearLongPress();
+    longPressTriggeredRef.current = false;
+    longPressTimeoutRef.current = window.setTimeout(() => {
+      longPressTriggeredRef.current = true;
+      onDayLongPress(day);
+    }, 450);
+  }
+
   return (
     <div className="glass-panel p-4">
       <div className="flex items-center justify-between mb-2.5">
         <div className="font-semibold capitalize glass-title text-base">{monthLabel}</div>
-        <div className="text-[11px] muted">Toca para marcar</div>
+        <div className="text-[11px] muted">Toca para marcar, mantén para detalle</div>
       </div>
 
       <div className="grid grid-cols-7 gap-1.5 text-[10px] muted mb-2 select-none">
@@ -58,7 +81,21 @@ export default function CalendarGrid({
           return (
             <button
               key={day}
-              onClick={() => onDayClick(day)}
+              onClick={() => {
+                if (longPressTriggeredRef.current) {
+                  longPressTriggeredRef.current = false;
+                  return;
+                }
+                onDayClick(day);
+              }}
+              onPointerDown={(e) => {
+                if (e.button !== 0) return;
+                startLongPress(day);
+              }}
+              onPointerUp={clearLongPress}
+              onPointerLeave={clearLongPress}
+              onPointerCancel={clearLongPress}
+              onContextMenu={(e) => e.preventDefault()}
               className={[
                 "calendar-day h-9 text-xs font-semibold tabular-nums",
                 "transition duration-200 active:scale-[0.98]",

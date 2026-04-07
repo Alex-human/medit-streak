@@ -5,7 +5,14 @@ import CalendarGrid from "@/components/CalendarGrid";
 import StreakHeader from "@/components/StreakHeader";
 import TimeBackground from "@/components/TimeBackground";
 import { computeStreak } from "@/lib/streak";
-import { addSession, getAllDays, type DayRecord } from "@/lib/storage/sessions";
+import {
+  addSession,
+  deleteSession,
+  getAllDays,
+  updateSession,
+  type DayRecord,
+  type MeditationSession,
+} from "@/lib/storage/sessions";
 import { useRouter } from "next/navigation";
 
 function startOfMonthLocal(d: Date) {
@@ -32,6 +39,20 @@ function formatDayLabel(day: string) {
   }).format(new Date(year, month - 1, date));
 }
 
+function formatSessionTime(createdAt: number) {
+  return new Intl.DateTimeFormat("es-ES", {
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(createdAt));
+}
+
+type SessionEditorState = {
+  day: string;
+  sessionId: string;
+  minutes: string;
+  createdAt: number;
+};
+
 export default function HomePage() {
   const router = useRouter();
   const [monthDate, setMonthDate] = useState<Date>(() => startOfMonthLocal(new Date()));
@@ -43,6 +64,11 @@ export default function HomePage() {
   const [manualConfirmed, setManualConfirmed] = useState(false);
   const [manualSaving, setManualSaving] = useState(false);
   const manualSavingRef = useRef(false);
+  const [editingSession, setEditingSession] = useState<SessionEditorState | null>(null);
+  const [editConfirmed, setEditConfirmed] = useState(false);
+  const [editSaving, setEditSaving] = useState(false);
+  const editSavingRef = useRef(false);
+  const [pendingDeleteSessionId, setPendingDeleteSessionId] = useState<string | null>(null);
   const swipeStartRef = useRef<{ x: number; y: number; at: number } | null>(null);
   const navigatingRef = useRef(false);
 
@@ -119,7 +145,35 @@ export default function HomePage() {
     setManualSaving(false);
   }
 
-  async function onDayClick(day: string) {
+  function closeManualDay(force = false) {
+    if (manualSavingRef.current && !force) return;
+    setManualDay(null);
+    setManualConfirmed(false);
+    manualSavingRef.current = false;
+    setManualSaving(false);
+  }
+
+  function openSessionEditor(day: string, session: MeditationSession) {
+    setEditingSession({
+      day,
+      sessionId: session.id,
+      minutes: String(session.minutes),
+      createdAt: session.createdAt,
+    });
+    setEditConfirmed(false);
+    editSavingRef.current = false;
+    setEditSaving(false);
+  }
+
+  function closeSessionEditor(force = false) {
+    if (editSavingRef.current && !force) return;
+    setEditingSession(null);
+    setEditConfirmed(false);
+    editSavingRef.current = false;
+    setEditSaving(false);
+  }
+
+  function onDayClick(day: string) {
     openManualDay(day);
   }
 
@@ -142,12 +196,51 @@ export default function HomePage() {
       await addSession(day, minutes);
       const next = await getAllDays();
       setRecords(next);
-      setManualDay(null);
+      closeManualDay(true);
       setManualMinutes(String(minutes));
       setManualConfirmed(false);
     } finally {
       manualSavingRef.current = false;
       setManualSaving(false);
+    }
+  }
+
+  async function confirmSessionEdit() {
+    if (!editingSession || !editConfirmed || editSavingRef.current) return;
+
+    const parsedMinutes = Number(editingSession.minutes);
+    const minutes = Number.isFinite(parsedMinutes) ? Math.max(1, Math.round(parsedMinutes)) : NaN;
+    if (!Number.isFinite(minutes)) return;
+
+    editSavingRef.current = true;
+    setEditSaving(true);
+
+    try {
+      await updateSession(editingSession.day, editingSession.sessionId, minutes);
+      const next = await getAllDays();
+      setRecords(next);
+      closeSessionEditor(true);
+    } finally {
+      editSavingRef.current = false;
+      setEditSaving(false);
+    }
+  }
+
+  async function removeSession(day: string, sessionId: string, closeEditor = false) {
+    if (pendingDeleteSessionId === sessionId) return;
+
+    setPendingDeleteSessionId(sessionId);
+
+    try {
+      await deleteSession(day, sessionId);
+      const next = await getAllDays();
+      setRecords(next);
+
+      if (closeEditor && editingSession?.sessionId === sessionId) {
+        closeSessionEditor();
+      }
+    } finally {
+      setPendingDeleteSessionId(null);
     }
   }
 
@@ -307,17 +400,35 @@ export default function HomePage() {
               {detailStats.sessions.length > 0 ? (
                 <div className="mt-2 space-y-2">
                   {detailStats.sessions.map((session, index) => (
-                    <div key={session.id} className="flex items-center justify-between gap-3 rounded-2xl border border-white/15 bg-white/8 px-3 py-2">
-                      <div>
-                        <div className="text-sm font-semibold">Sesión {index + 1}</div>
-                        <div className="text-[11px] muted">
-                          {new Intl.DateTimeFormat("es-ES", {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          }).format(new Date(session.createdAt))}
+                    <div key={session.id} className="rounded-2xl border border-white/15 bg-white/8 px-3 py-2">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <div className="text-sm font-semibold">Sesión {index + 1}</div>
+                          <div className="text-[11px] muted">{formatSessionTime(session.createdAt)}</div>
                         </div>
+                        <div className="text-lg font-semibold tabular-nums">{session.minutes} min</div>
                       </div>
-                      <div className="text-lg font-semibold tabular-nums">{session.minutes} min</div>
+
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => openSessionEditor(detailStats.day, session)}
+                          className="glass-button glass-button-muted px-3 py-1.5 text-xs"
+                        >
+                          Editar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void removeSession(detailStats.day, session.id)}
+                          disabled={pendingDeleteSessionId === session.id}
+                          className={[
+                            "glass-button px-3 py-1.5 text-xs",
+                            pendingDeleteSessionId === session.id ? "opacity-55 cursor-not-allowed" : "",
+                          ].join(" ")}
+                        >
+                          {pendingDeleteSessionId === session.id ? "Eliminando..." : "Eliminar"}
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -334,13 +445,7 @@ export default function HomePage() {
       {manualDay && (
         <div
           className="fixed inset-0 z-30 flex items-center justify-center px-4"
-          onClick={() => {
-            if (manualSavingRef.current) return;
-            setManualDay(null);
-            setManualConfirmed(false);
-            manualSavingRef.current = false;
-            setManualSaving(false);
-          }}
+          onClick={() => closeManualDay()}
           role="presentation"
         >
           <div className="absolute inset-0 bg-[rgba(7,14,28,0.16)] backdrop-blur-[4px]" />
@@ -400,6 +505,89 @@ export default function HomePage() {
             >
               {manualSaving ? "Guardando..." : "Confirmar sesión"}
             </button>
+          </div>
+        </div>
+      )}
+
+      {editingSession && (
+        <div
+          className="fixed inset-0 z-40 flex items-center justify-center px-4"
+          onClick={() => closeSessionEditor()}
+          role="presentation"
+        >
+          <div className="absolute inset-0 bg-[rgba(7,14,28,0.16)] backdrop-blur-[4px]" />
+          <div
+            className="relative w-full max-w-sm glass-popover p-4 soft-reveal"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Editar meditación del ${formatDayLabel(editingSession.day)}`}
+          >
+            <div className="text-xs muted">Editar sesión</div>
+            <div className="glass-title text-xl font-semibold capitalize mt-1">{formatDayLabel(editingSession.day)}</div>
+            <div className="text-[11px] muted mt-1">Sesión registrada a las {formatSessionTime(editingSession.createdAt)}</div>
+
+            <div className="mt-4">
+              <label className="text-[11px] muted block mb-2" htmlFor="edit-minutes">
+                Minutos meditados
+              </label>
+              <input
+                id="edit-minutes"
+                type="number"
+                inputMode="numeric"
+                min={1}
+                max={180}
+                value={editingSession.minutes}
+                disabled={editSaving || pendingDeleteSessionId === editingSession.sessionId}
+                onChange={(e) =>
+                  setEditingSession((current) => (current ? { ...current, minutes: e.target.value } : current))
+                }
+                className="glass-input w-full text-base font-semibold"
+              />
+            </div>
+
+            <label className="mt-4 glass-panel-soft p-3 flex items-start gap-3 cursor-pointer">
+              <span className="glass-check">
+                <input
+                  type="checkbox"
+                  checked={editConfirmed}
+                  onChange={(e) => setEditConfirmed(e.target.checked)}
+                  disabled={editSaving || pendingDeleteSessionId === editingSession.sessionId}
+                  className="sr-only"
+                />
+                <span className={editConfirmed ? "glass-check-indicator glass-check-indicator-checked" : "glass-check-indicator"} />
+              </span>
+              <span className="text-sm leading-6">
+                Confirmo que soy honesto conmigo mismo y he meditado de verdad.
+              </span>
+            </label>
+
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => void removeSession(editingSession.day, editingSession.sessionId, true)}
+                disabled={editSaving || pendingDeleteSessionId === editingSession.sessionId}
+                className={[
+                  "glass-button glass-button-muted py-3",
+                  editSaving || pendingDeleteSessionId === editingSession.sessionId ? "opacity-55 cursor-not-allowed" : "",
+                ].join(" ")}
+              >
+                {pendingDeleteSessionId === editingSession.sessionId ? "Eliminando..." : "Eliminar sesión"}
+              </button>
+              <button
+                type="button"
+                onClick={() => void confirmSessionEdit()}
+                disabled={editSaving || !editConfirmed || !editingSession.minutes || Number(editingSession.minutes) <= 0}
+                className={[
+                  "glass-button glass-button-primary py-3",
+                  editSaving || !editConfirmed || !editingSession.minutes || Number(editingSession.minutes) <= 0
+                    ? "opacity-55 cursor-not-allowed"
+                    : "",
+                ].join(" ")}
+              >
+                {editSaving ? "Guardando..." : "Guardar cambios"}
+              </button>
+            </div>
           </div>
         </div>
       )}

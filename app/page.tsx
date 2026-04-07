@@ -5,7 +5,7 @@ import CalendarGrid from "@/components/CalendarGrid";
 import StreakHeader from "@/components/StreakHeader";
 import TimeBackground from "@/components/TimeBackground";
 import { computeStreak } from "@/lib/streak";
-import { getAllDays, toggleComplete, type DayRecord } from "@/lib/storage/sessions";
+import { addSession, getAllDays, type DayRecord } from "@/lib/storage/sessions";
 import { useRouter } from "next/navigation";
 
 function startOfMonthLocal(d: Date) {
@@ -38,6 +38,11 @@ export default function HomePage() {
   const [records, setRecords] = useState<DayRecord[]>([]);
   const [hydrated, setHydrated] = useState(false);
   const [detailDay, setDetailDay] = useState<string | null>(null);
+  const [manualDay, setManualDay] = useState<string | null>(null);
+  const [manualMinutes, setManualMinutes] = useState("10");
+  const [manualConfirmed, setManualConfirmed] = useState(false);
+  const [manualSaving, setManualSaving] = useState(false);
+  const manualSavingRef = useRef(false);
   const swipeStartRef = useRef<{ x: number; y: number; at: number } | null>(null);
   const navigatingRef = useRef(false);
 
@@ -69,21 +74,20 @@ export default function HomePage() {
   const monthStats = useMemo(() => {
     const key = monthKey(monthDate);
     const inMonth = records.filter((r) => r.day.startsWith(key));
-    const completed = inMonth.filter((r) => r.completed);
-
-    const sessions = completed.length;
-    const minutes = completed.reduce((acc, r) => acc + (r.minutes || 0), 0);
+    const sessionsList = inMonth.flatMap((record) => record.sessions);
+    const sessions = sessionsList.length;
+    const minutes = sessionsList.reduce((acc, session) => acc + session.minutes, 0);
     const avg = sessions > 0 ? Math.round(minutes / sessions) : 0;
 
     return { sessions, minutes, avg };
   }, [records, monthDate]);
 
   const defaultMinutes = useMemo(() => {
-    const latestCompleted = [...records]
-      .filter((record) => record.completed && record.minutes > 0)
-      .sort((a, b) => b.updatedAt - a.updatedAt)[0];
+    const latestSession = [...records]
+      .flatMap((record) => record.sessions)
+      .sort((a, b) => b.createdAt - a.createdAt)[0];
 
-    return latestCompleted?.minutes ?? 10;
+    return latestSession?.minutes ?? 10;
   }, [records]);
 
   const detailStats = useMemo(() => {
@@ -91,26 +95,60 @@ export default function HomePage() {
 
     const selectedRecord = records.find((record) => record.day === detailDay);
     const selectedMonth = detailDay.slice(0, 7);
-    const monthCompleted = records.filter((record) => record.completed && record.day.startsWith(selectedMonth));
-    const monthMinutes = monthCompleted.reduce((acc, record) => acc + (record.minutes || 0), 0);
-    const monthAverage = monthCompleted.length > 0 ? Math.round(monthMinutes / monthCompleted.length) : 0;
+    const monthSessions = records
+      .filter((record) => record.day.startsWith(selectedMonth))
+      .flatMap((record) => record.sessions);
+    const monthMinutes = monthSessions.reduce((acc, session) => acc + session.minutes, 0);
+    const monthAverage = monthSessions.length > 0 ? Math.round(monthMinutes / monthSessions.length) : 0;
 
     return {
       day: detailDay,
       label: formatDayLabel(detailDay),
       completed: selectedRecord?.completed ?? false,
-      dayMinutes: selectedRecord?.completed ? selectedRecord.minutes : 0,
+      dayMinutes: selectedRecord?.minutes ?? 0,
+      sessions: selectedRecord?.sessions ?? [],
       monthAverage,
     };
   }, [detailDay, records]);
 
+  function openManualDay(day: string) {
+    setManualDay(day);
+    setManualMinutes("");
+    setManualConfirmed(false);
+    manualSavingRef.current = false;
+    setManualSaving(false);
+  }
+
   async function onDayClick(day: string) {
-    await toggleComplete(day, defaultMinutes);
-    setRecords(await getAllDays());
+    openManualDay(day);
   }
 
   function onDayLongPress(day: string) {
     setDetailDay(day);
+  }
+
+  async function confirmManualSession() {
+    if (!manualDay || !manualConfirmed || manualSavingRef.current) return;
+
+    const parsedMinutes = Number(manualMinutes);
+    const minutes = Number.isFinite(parsedMinutes) ? Math.max(1, Math.round(parsedMinutes)) : NaN;
+    if (!Number.isFinite(minutes)) return;
+
+    manualSavingRef.current = true;
+    setManualSaving(true);
+
+    try {
+      const day = manualDay;
+      await addSession(day, minutes);
+      const next = await getAllDays();
+      setRecords(next);
+      setManualDay(null);
+      setManualMinutes(String(minutes));
+      setManualConfirmed(false);
+    } finally {
+      manualSavingRef.current = false;
+      setManualSaving(false);
+    }
   }
 
   function onTouchStart(e: TouchEvent<HTMLElement>) {
@@ -255,7 +293,7 @@ export default function HomePage() {
 
             <div className="mt-4 grid grid-cols-2 gap-2">
               <div className="glass-panel-soft p-3">
-                <div className="text-[11px] muted">Meditaste</div>
+                <div className="text-[11px] muted">Minutos del día</div>
                 <div className="text-2xl font-semibold tabular-nums mt-1">{detailStats.dayMinutes} min</div>
               </div>
               <div className="glass-panel-soft p-3">
@@ -264,7 +302,104 @@ export default function HomePage() {
               </div>
             </div>
 
+            <div className="mt-3 glass-panel-soft p-3">
+              <div className="text-[11px] muted">Sesiones de ese día</div>
+              {detailStats.sessions.length > 0 ? (
+                <div className="mt-2 space-y-2">
+                  {detailStats.sessions.map((session, index) => (
+                    <div key={session.id} className="flex items-center justify-between gap-3 rounded-2xl border border-white/15 bg-white/8 px-3 py-2">
+                      <div>
+                        <div className="text-sm font-semibold">Sesión {index + 1}</div>
+                        <div className="text-[11px] muted">
+                          {new Intl.DateTimeFormat("es-ES", {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          }).format(new Date(session.createdAt))}
+                        </div>
+                      </div>
+                      <div className="text-lg font-semibold tabular-nums">{session.minutes} min</div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-sm muted mt-2">No hay sesiones registradas en este día.</div>
+              )}
+            </div>
+
             <div className="text-[11px] muted mt-3">Toca cualquier parte fuera de esta ventana para cerrarla.</div>
+          </div>
+        </div>
+      )}
+
+      {manualDay && (
+        <div
+          className="fixed inset-0 z-30 flex items-center justify-center px-4"
+          onClick={() => {
+            if (manualSavingRef.current) return;
+            setManualDay(null);
+            setManualConfirmed(false);
+            manualSavingRef.current = false;
+            setManualSaving(false);
+          }}
+          role="presentation"
+        >
+          <div className="absolute inset-0 bg-[rgba(7,14,28,0.16)] backdrop-blur-[4px]" />
+          <div
+            className="relative w-full max-w-sm glass-popover p-4 soft-reveal"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Registrar meditación del ${formatDayLabel(manualDay)}`}
+          >
+            <div className="text-xs muted">Registrar meditación</div>
+            <div className="glass-title text-xl font-semibold capitalize mt-1">{formatDayLabel(manualDay)}</div>
+
+            <div className="mt-4">
+              <label className="text-[11px] muted block mb-2" htmlFor="manual-minutes">
+                Minutos meditados
+              </label>
+              <input
+                id="manual-minutes"
+                type="number"
+                inputMode="numeric"
+                min={1}
+                max={180}
+                value={manualMinutes}
+                placeholder={String(defaultMinutes)}
+                disabled={manualSaving}
+                onChange={(e) => setManualMinutes(e.target.value)}
+                className="glass-input w-full text-base font-semibold"
+              />
+              <div className="text-[11px] muted mt-2">Sugerencia: {defaultMinutes} min si quieres usar tu duración habitual.</div>
+            </div>
+
+            <label className="mt-4 glass-panel-soft p-3 flex items-start gap-3 cursor-pointer">
+              <span className="glass-check">
+                <input
+                  type="checkbox"
+                  checked={manualConfirmed}
+                  onChange={(e) => setManualConfirmed(e.target.checked)}
+                  disabled={manualSaving}
+                  className="sr-only"
+                />
+                <span className={manualConfirmed ? "glass-check-indicator glass-check-indicator-checked" : "glass-check-indicator"} />
+              </span>
+              <span className="text-sm leading-6">
+                Confirmo que soy honesto conmigo mismo y he meditado de verdad.
+              </span>
+            </label>
+
+            <button
+              type="button"
+              onClick={() => void confirmManualSession()}
+              disabled={manualSaving || !manualConfirmed || !manualMinutes || Number(manualMinutes) <= 0}
+              className={[
+                "glass-button glass-button-primary w-full mt-4 py-3",
+                manualSaving || !manualConfirmed || !manualMinutes || Number(manualMinutes) <= 0 ? "opacity-55 cursor-not-allowed" : "",
+              ].join(" ")}
+            >
+              {manualSaving ? "Guardando..." : "Confirmar sesión"}
+            </button>
           </div>
         </div>
       )}

@@ -59,7 +59,7 @@ export default function CalendarGrid({
     <div className="glass-panel p-4">
       <div className="flex items-center justify-between mb-2.5">
         <div className="font-semibold capitalize glass-title text-base">{monthLabel}</div>
-        <div className="text-[11px] muted">Toca para marcar, mantén para detalle</div>
+        <div className="text-[11px] muted">Toca para registrar, mantén para detalle</div>
       </div>
 
       <div className="grid grid-cols-7 gap-1.5 text-[10px] muted mb-2 select-none">

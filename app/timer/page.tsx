@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import TimerCard from "@/components/TimerCard";
 import TimeBackground from "@/components/TimeBackground";
 import { toDayString } from "@/lib/dates";
-import { upsertDay } from "@/lib/storage/sessions";
+import { addSession } from "@/lib/storage/sessions";
 import { useState } from "react";
 
 export default function TimerPage() {
@@ -14,12 +14,7 @@ export default function TimerPage() {
 
   async function onFinish() {
     const today = toDayString(new Date());
-    await upsertDay({
-      day: today,
-      minutes: selectedMinutes,
-      completed: true,
-      updatedAt: Date.now(),
-    });
+    await addSession(today, selectedMinutes);
     router.push("/");
   }
 

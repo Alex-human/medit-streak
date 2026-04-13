@@ -462,9 +462,12 @@ export async function upsertDay(rec: DayRecord) {
   }
 }
 
-export async function addSession(day: string, minutes: number, createdAt = Date.now()): Promise<DayRecord> {
-  const sessionId = `${createdAt}-${Math.random().toString(36).slice(2, 8)}`;
-
+export async function addSession(
+  day: string,
+  minutes: number,
+  createdAt = Date.now(),
+  sessionId = `${createdAt}-${Math.random().toString(36).slice(2, 8)}`,
+): Promise<DayRecord> {
   for (let attempt = 0; attempt < 2; attempt += 1) {
     const latestMap = await loadAllMap();
     const latestDay = latestMap[day];
@@ -491,17 +494,11 @@ export async function addSession(day: string, minutes: number, createdAt = Date.
   }
 
   const fallback = await getDay(day);
-  return (
-    fallback ??
-    buildDayRecord(day, [
-      {
-        id: sessionId,
-        minutes: Math.max(1, Math.round(minutes)),
-        createdAt,
-        version: makeVersion(1, getDeviceId()),
-      },
-    ])
-  );
+  if (fallback?.sessions.some((session) => session.id === sessionId)) {
+    return fallback;
+  }
+
+  throw new Error(`No se pudo guardar la sesión de meditación para ${day}.`);
 }
 
 export async function updateSession(day: string, sessionId: string, minutes: number): Promise<DayRecord | null> {

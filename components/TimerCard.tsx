@@ -1,6 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  clearActiveTimer,
+  getActiveTimer,
+  markActiveTimerCompleted,
+  startActiveTimer,
+  type ActiveTimerSession,
+} from "@/lib/timerSession";
 
 const PRESETS = [5, 10, 15, 20];
 
@@ -14,14 +21,16 @@ export default function TimerCard({
   onFinish,
   onMinutesChange,
 }: {
-  onFinish?: () => void;
+  onFinish?: (payload: { minutes: number; finishedAt: number; sessionId: string }) => Promise<void> | void;
   onMinutesChange?: (minutes: number) => void;
 }) {
   const [minutes, setMinutes] = useState<number>(10);
   const [secondsLeft, setSecondsLeft] = useState<number>(minutes * 60);
   const [running, setRunning] = useState(false);
+  const [finishStatus, setFinishStatus] = useState<"idle" | "saving" | "error">("idle");
 
   const endAtRef = useRef<number | null>(null);
+  const activeTimerRef = useRef<ActiveTimerSession | null>(null);
   const finishCalledRef = useRef(false);
 
   // Fallback HTMLAudio (por si WebAudio falla por cualquier motivo)
@@ -35,12 +44,6 @@ export default function TimerCard({
   const getRemainingSeconds = useCallback((endAt: number) => {
     return Math.max(0, Math.ceil((endAt - Date.now()) / 1000));
   }, []);
-
-  const completeFinish = useCallback(() => {
-    if (finishCalledRef.current) return;
-    finishCalledRef.current = true;
-    onFinish?.();
-  }, [onFinish]);
 
   const ensureAudioContextAndBuffer = useCallback(async () => {
     // Reutiliza promesa si ya está cargando
@@ -130,18 +133,99 @@ export default function TimerCard({
     }
   }, [ensureAudioContextAndBuffer]);
 
-  const handleFinish = useCallback(async () => {
+  const restoreFromActiveTimer = useCallback(() => {
+    const active = getActiveTimer();
+    activeTimerRef.current = active;
+
+    if (!active) return null;
+
+    setMinutes(active.minutes);
+    onMinutesChange?.(active.minutes);
+
+    const effectiveEnd = active.completedAt ?? active.endAt;
+    const next = getRemainingSeconds(effectiveEnd);
+    setSecondsLeft(next);
+
+    if (active.completedAt || effectiveEnd <= Date.now()) {
+      setFinishStatus(active.completedAt ? "error" : "idle");
+      setRunning(false);
+      endAtRef.current = null;
+      return {
+        timer: active,
+        finishedAt: active.completedAt ?? active.endAt,
+      };
+    }
+
+    endAtRef.current = active.endAt;
     finishCalledRef.current = false;
-    await playGong();
-    completeFinish();
-  }, [playGong, completeFinish]);
+    setFinishStatus("idle");
+    setRunning(true);
+    return null;
+  }, [getRemainingSeconds, onMinutesChange]);
+
+  const handleFinish = useCallback(async (timer: ActiveTimerSession, finishedAt = Date.now()) => {
+    if (finishCalledRef.current) return;
+    finishCalledRef.current = true;
+
+    const settledAt = Math.max(finishedAt, timer.endAt);
+    setSecondsLeft(0);
+    setRunning(false);
+    setFinishStatus("saving");
+    endAtRef.current = null;
+
+    markActiveTimerCompleted(timer.id, settledAt);
+    void playGong();
+
+    try {
+      await onFinish?.({
+        minutes: timer.minutes,
+        finishedAt: settledAt,
+        sessionId: timer.id,
+      });
+      if (clearActiveTimer(timer.id)) {
+        activeTimerRef.current = null;
+        setFinishStatus("idle");
+      } else {
+        finishCalledRef.current = false;
+        setFinishStatus("error");
+      }
+    } catch {
+      finishCalledRef.current = false;
+      setFinishStatus("error");
+    }
+  }, [onFinish, playGong]);
+
+  useEffect(() => {
+    const pending = restoreFromActiveTimer();
+    if (pending) {
+      void handleFinish(pending.timer, pending.finishedAt);
+    }
+
+    const sync = () => {
+      const nextPending = restoreFromActiveTimer();
+      if (nextPending) {
+        void handleFinish(nextPending.timer, nextPending.finishedAt);
+      }
+    };
+
+    window.addEventListener("focus", sync);
+    document.addEventListener("visibilitychange", sync);
+    window.addEventListener("pageshow", sync);
+
+    return () => {
+      window.removeEventListener("focus", sync);
+      document.removeEventListener("visibilitychange", sync);
+      window.removeEventListener("pageshow", sync);
+    };
+  }, [handleFinish, restoreFromActiveTimer]);
 
   useEffect(() => {
     if (!running) return;
 
     const tick = () => {
-      const endAt = endAtRef.current;
-      if (!endAt) return;
+      const active = activeTimerRef.current;
+      const endAt = active?.endAt ?? endAtRef.current;
+      if (!active || !endAt) return;
 
       const next = getRemainingSeconds(endAt);
       setSecondsLeft(next);
@@ -149,24 +233,25 @@ export default function TimerCard({
       if (next === 0) {
         setRunning(false);
         endAtRef.current = null;
-        void handleFinish();
+        void handleFinish(active, endAt);
       }
     };
 
     const id = window.setInterval(tick, 250);
-    window.addEventListener("visibilitychange", tick);
+    document.addEventListener("visibilitychange", tick);
     window.addEventListener("focus", tick);
     window.addEventListener("pageshow", tick);
 
     return () => {
       window.clearInterval(id);
-      window.removeEventListener("visibilitychange", tick);
+      document.removeEventListener("visibilitychange", tick);
       window.removeEventListener("focus", tick);
       window.removeEventListener("pageshow", tick);
     };
   }, [running, getRemainingSeconds, handleFinish]);
 
   const label = useMemo(() => formatSeconds(secondsLeft), [secondsLeft]);
+  const completionPending = finishStatus !== "idle" || Boolean(activeTimerRef.current?.completedAt);
 
   return (
     <div className="glass-panel p-4">
@@ -196,7 +281,7 @@ export default function TimerCard({
           <button
             key={p}
             onClick={() => {
-              if (running) return;
+              if (running || completionPending) return;
               setMinutes(p);
               setSecondsLeft(p * 60);
               onMinutesChange?.(p);
@@ -204,9 +289,9 @@ export default function TimerCard({
             className={[
               "glass-button text-sm",
               minutes === p ? "glass-button-primary" : "glass-button-muted",
-              running ? "opacity-45 cursor-not-allowed" : "",
+              running || completionPending ? "opacity-45 cursor-not-allowed" : "",
             ].join(" ")}
-            disabled={running}
+            disabled={running || completionPending}
           >
             {p} min
           </button>
@@ -218,7 +303,7 @@ export default function TimerCard({
           min={1}
           max={180}
           value={minutes}
-          disabled={running}
+          disabled={running || completionPending}
           onChange={(e) => {
             const next = Math.max(1, Number(e.target.value));
             setMinutes(next);
@@ -230,30 +315,74 @@ export default function TimerCard({
         />
       </div>
 
+      {finishStatus === "saving" ? (
+        <div className="text-sm muted mt-4">Guardando tu sesión para que no se pierda.</div>
+      ) : null}
+
+      {finishStatus === "error" ? (
+        <div className="text-sm text-red-700 mt-4">
+          No se pudo guardar la sesión todavía. No se perderá: pulsa “Reintentar guardado”.
+        </div>
+      ) : null}
+
       <div className="flex gap-2 mt-5">
         {!running ? (
-          <button
-            onClick={() => {
-              // Clave: prepara WebAudio en el gesto del usuario
-              void ensureAudioContextAndBuffer();
+          finishStatus === "saving" ? (
+            <button
+              className="glass-button glass-button-primary flex-1 py-3 opacity-45 cursor-not-allowed"
+              disabled
+            >
+              Guardando...
+            </button>
+          ) : finishStatus === "error" ? (
+            <button
+              onClick={() => {
+                const active = activeTimerRef.current;
+                if (!active) return;
+                void handleFinish(active, active.completedAt ?? active.endAt);
+              }}
+              className="glass-button glass-button-primary flex-1 py-3"
+            >
+              Reintentar guardado
+            </button>
+          ) : (
+            <button
+              onClick={() => {
+                if (completionPending) return;
 
-              const durationSeconds =
-                secondsLeft > 0 ? secondsLeft : minutes * 60;
-              setSecondsLeft(durationSeconds);
-              endAtRef.current = Date.now() + durationSeconds * 1000;
-              setRunning(true);
-            }}
-            className="glass-button glass-button-primary flex-1 py-3"
-          >
-            Empezar
-          </button>
+                // Clave: prepara WebAudio en el gesto del usuario
+                void ensureAudioContextAndBuffer();
+
+                const durationSeconds =
+                  secondsLeft > 0 ? secondsLeft : minutes * 60;
+                const active = startActiveTimer(minutes, durationSeconds);
+                activeTimerRef.current = active;
+                finishCalledRef.current = false;
+                setFinishStatus("idle");
+                setSecondsLeft(durationSeconds);
+                endAtRef.current = active.endAt;
+                setRunning(true);
+              }}
+              className={[
+                "glass-button glass-button-primary flex-1 py-3",
+                completionPending ? "opacity-45 cursor-not-allowed" : "",
+              ].join(" ")}
+              disabled={completionPending}
+            >
+              Empezar
+            </button>
+          )
         ) : (
           <button
             onClick={() => {
               if (endAtRef.current) {
                 setSecondsLeft(getRemainingSeconds(endAtRef.current));
               }
+              clearActiveTimer(activeTimerRef.current?.id);
+              activeTimerRef.current = null;
               endAtRef.current = null;
+              finishCalledRef.current = false;
+              setFinishStatus("idle");
               setRunning(false);
             }}
             className="glass-button glass-button-muted flex-1 py-3"
@@ -264,11 +393,20 @@ export default function TimerCard({
 
         <button
           onClick={() => {
+            if (completionPending) return;
+            clearActiveTimer(activeTimerRef.current?.id);
+            activeTimerRef.current = null;
+            finishCalledRef.current = false;
+            setFinishStatus("idle");
             setRunning(false);
             endAtRef.current = null;
             setSecondsLeft(minutes * 60);
           }}
-          className="glass-button glass-button-muted py-3"
+          className={[
+            "glass-button glass-button-muted py-3",
+            completionPending ? "opacity-45 cursor-not-allowed" : "",
+          ].join(" ")}
+          disabled={completionPending}
         >
           Reset
         </button>

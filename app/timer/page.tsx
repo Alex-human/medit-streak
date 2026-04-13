@@ -6,15 +6,21 @@ import TimerCard from "@/components/TimerCard";
 import TimeBackground from "@/components/TimeBackground";
 import { toDayString } from "@/lib/dates";
 import { addSession } from "@/lib/storage/sessions";
-import { useState } from "react";
 
 export default function TimerPage() {
   const router = useRouter();
-  const [selectedMinutes, setSelectedMinutes] = useState(10);
 
-  async function onFinish() {
-    const today = toDayString(new Date());
-    await addSession(today, selectedMinutes);
+  async function onFinish({
+    minutes,
+    finishedAt,
+    sessionId,
+  }: {
+    minutes: number;
+    finishedAt: number;
+    sessionId: string;
+  }) {
+    const day = toDayString(new Date(finishedAt));
+    await addSession(day, minutes, finishedAt, sessionId);
     router.push("/");
   }
 
@@ -38,7 +44,7 @@ export default function TimerPage() {
             <div className="text-sm muted mt-1">Silencio guiado por tiempo real, incluso en segundo plano.</div>
           </div>
 
-          <TimerCard onFinish={onFinish} onMinutesChange={(m) => setSelectedMinutes(m)} />
+          <TimerCard onFinish={onFinish} />
 
           <div className="glass-panel p-4 text-sm muted">
             Al terminar, se marcará “hoy” como meditado y volverás al inicio.

@@ -63,6 +63,7 @@ export default function HomePage() {
   const [manualMinutes, setManualMinutes] = useState("10");
   const [manualConfirmed, setManualConfirmed] = useState(false);
   const [manualSaving, setManualSaving] = useState(false);
+  const [manualError, setManualError] = useState<string | null>(null);
   const manualSavingRef = useRef(false);
   const [editingSession, setEditingSession] = useState<SessionEditorState | null>(null);
   const [editConfirmed, setEditConfirmed] = useState(false);
@@ -141,6 +142,7 @@ export default function HomePage() {
     setManualDay(day);
     setManualMinutes("");
     setManualConfirmed(false);
+    setManualError(null);
     manualSavingRef.current = false;
     setManualSaving(false);
   }
@@ -149,6 +151,7 @@ export default function HomePage() {
     if (manualSavingRef.current && !force) return;
     setManualDay(null);
     setManualConfirmed(false);
+    setManualError(null);
     manualSavingRef.current = false;
     setManualSaving(false);
   }
@@ -190,6 +193,7 @@ export default function HomePage() {
 
     manualSavingRef.current = true;
     setManualSaving(true);
+    setManualError(null);
 
     try {
       const day = manualDay;
@@ -199,6 +203,8 @@ export default function HomePage() {
       closeManualDay(true);
       setManualMinutes(String(minutes));
       setManualConfirmed(false);
+    } catch {
+      setManualError("No se pudo guardar la sesión. Inténtalo de nuevo.");
     } finally {
       manualSavingRef.current = false;
       setManualSaving(false);
@@ -493,6 +499,8 @@ export default function HomePage() {
                 Confirmo que soy honesto conmigo mismo y he meditado de verdad.
               </span>
             </label>
+
+            {manualError ? <div className="text-[11px] text-red-700 mt-3">{manualError}</div> : null}
 
             <button
               type="button"

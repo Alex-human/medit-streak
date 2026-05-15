@@ -140,7 +140,7 @@ export default function HomePage() {
 
   function openManualDay(day: string) {
     setManualDay(day);
-    setManualMinutes("");
+    setManualMinutes(String(defaultMinutes));
     setManualConfirmed(false);
     setManualError(null);
     manualSavingRef.current = false;

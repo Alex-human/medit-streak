@@ -60,7 +60,7 @@ export function weekdayIndexMondayFirst(d: Date): number {
 
 export function formatMonthYear(d: Date): string {
   try {
-    return new Intl.DateTimeFormat(undefined, {
+    return new Intl.DateTimeFormat("es-ES", {
       timeZone: localTimeZone(),
       calendar: "gregory",
       month: "long",

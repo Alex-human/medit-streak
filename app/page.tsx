@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, type TouchEvent } from "react";
 import CalendarGrid from "@/components/CalendarGrid";
 import StreakHeader from "@/components/StreakHeader";
 import TimeBackground from "@/components/TimeBackground";
+import { toDayString } from "@/lib/dates";
 import { computeStreak } from "@/lib/streak";
 import {
   addSession,
@@ -72,6 +73,7 @@ export default function HomePage() {
   const [pendingDeleteSessionId, setPendingDeleteSessionId] = useState<string | null>(null);
   const swipeStartRef = useRef<{ x: number; y: number; at: number } | null>(null);
   const navigatingRef = useRef(false);
+  const todayDay = toDayString(new Date());
 
   function goToTimer() {
     if (navigatingRef.current) return;
@@ -139,6 +141,8 @@ export default function HomePage() {
   }, [detailDay, records]);
 
   function openManualDay(day: string) {
+    if (day !== toDayString(new Date())) return;
+
     setManualDay(day);
     setManualMinutes(String(defaultMinutes));
     setManualConfirmed(false);
@@ -177,6 +181,8 @@ export default function HomePage() {
   }
 
   function onDayClick(day: string) {
+    if (day !== toDayString(new Date())) return;
+
     openManualDay(day);
   }
 
@@ -186,6 +192,10 @@ export default function HomePage() {
 
   async function confirmManualSession() {
     if (!manualDay || !manualConfirmed || manualSavingRef.current) return;
+    if (manualDay !== toDayString(new Date())) {
+      setManualError("Solo puedes registrar meditaciones del día de hoy.");
+      return;
+    }
 
     const parsedMinutes = Number(manualMinutes);
     const minutes = Number.isFinite(parsedMinutes) ? Math.max(1, Math.round(parsedMinutes)) : NaN;
@@ -350,6 +360,7 @@ export default function HomePage() {
           <CalendarGrid
             monthDate={monthDate}
             records={hydrated ? records : []}
+            todayDay={todayDay}
             onDayClick={onDayClick}
             onDayLongPress={onDayLongPress}
           />

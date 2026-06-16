@@ -13,11 +13,13 @@ import type { DayRecord } from "@/lib/storage/sessions";
 export default function CalendarGrid({
   monthDate,
   records,
+  todayDay,
   onDayClick,
   onDayLongPress,
 }: {
   monthDate: Date;
   records: DayRecord[];
+  todayDay: string;
   onDayClick: (day: string) => void;
   onDayLongPress: (day: string) => void;
 }) {
@@ -27,8 +29,6 @@ export default function CalendarGrid({
   const first = startOfMonth(monthDate);
   const total = daysInMonth(monthDate);
   const pad = weekdayIndexMondayFirst(first);
-
-  const todayStr = toDayString(new Date());
 
   const cells: (string | null)[] = [];
   for (let i = 0; i < pad; i++) cells.push(null);
@@ -59,7 +59,7 @@ export default function CalendarGrid({
     <div className="glass-panel p-4">
       <div className="flex items-center justify-between mb-2.5">
         <div className="font-semibold capitalize glass-title text-base">{monthLabel}</div>
-        <div className="text-[11px] muted">Toca para registrar, mantén para detalle</div>
+        <div className="text-[11px] muted">Solo hoy se puede registrar</div>
       </div>
 
       <div className="grid grid-cols-7 gap-1.5 text-[10px] muted mb-2 select-none">
@@ -76,16 +76,18 @@ export default function CalendarGrid({
 
           const rec = map.get(day);
           const completed = rec?.completed ?? false;
-          const isToday = day === todayStr;
+          const isToday = day === todayDay;
 
           return (
             <button
               key={day}
+              aria-disabled={!isToday}
               onClick={() => {
                 if (longPressTriggeredRef.current) {
                   longPressTriggeredRef.current = false;
                   return;
                 }
+                if (!isToday) return;
                 onDayClick(day);
               }}
               onPointerDown={(e) => {
@@ -98,11 +100,12 @@ export default function CalendarGrid({
               onContextMenu={(e) => e.preventDefault()}
               className={[
                 "calendar-day h-9 text-xs font-semibold tabular-nums",
-                "transition duration-200 active:scale-[0.98]",
+                "transition duration-200",
+                isToday ? "active:scale-[0.98]" : "cursor-default opacity-75",
                 completed ? "calendar-day-completed" : "calendar-day-empty",
                 isToday ? (completed ? "calendar-day-today-completed" : "calendar-day-today") : "",
               ].join(" ")}
-              title={day}
+              title={isToday ? "Registrar meditación de hoy" : "Solo puedes registrar meditaciones de hoy"}
             >
               {Number(day.slice(-2))}
             </button>

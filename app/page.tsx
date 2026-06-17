@@ -20,6 +20,11 @@ function startOfMonthLocal(d: Date) {
   return new Date(d.getFullYear(), d.getMonth(), 1);
 }
 
+function dateFromDayString(day: string) {
+  const [year, month, date] = day.split("-").map(Number);
+  return new Date(year, month - 1, date);
+}
+
 function addMonths(d: Date, delta: number) {
   return new Date(d.getFullYear(), d.getMonth() + delta, 1);
 }
@@ -31,13 +36,12 @@ function monthKey(d: Date) {
 }
 
 function formatDayLabel(day: string) {
-  const [year, month, date] = day.split("-").map(Number);
   return new Intl.DateTimeFormat("es-ES", {
     weekday: "long",
     day: "numeric",
     month: "long",
     year: "numeric",
-  }).format(new Date(year, month - 1, date));
+  }).format(dateFromDayString(day));
 }
 
 function formatSessionTime(createdAt: number) {
@@ -56,7 +60,8 @@ type SessionEditorState = {
 
 export default function HomePage() {
   const router = useRouter();
-  const [monthDate, setMonthDate] = useState<Date>(() => startOfMonthLocal(new Date()));
+  const [monthDate, setMonthDate] = useState<Date | null>(null);
+  const [todayDay, setTodayDay] = useState<string | null>(null);
   const [records, setRecords] = useState<DayRecord[]>([]);
   const [hydrated, setHydrated] = useState(false);
   const [detailDay, setDetailDay] = useState<string | null>(null);
@@ -73,7 +78,6 @@ export default function HomePage() {
   const [pendingDeleteSessionId, setPendingDeleteSessionId] = useState<string | null>(null);
   const swipeStartRef = useRef<{ x: number; y: number; at: number } | null>(null);
   const navigatingRef = useRef(false);
-  const todayDay = toDayString(new Date());
 
   function goToTimer() {
     if (navigatingRef.current) return;
@@ -81,8 +85,23 @@ export default function HomePage() {
     router.push("/timer");
   }
 
+  function goToToday() {
+    const now = new Date();
+    setTodayDay(toDayString(now));
+    setMonthDate(startOfMonthLocal(now));
+  }
+
   useEffect(() => {
     let active = true;
+    const syncToday = () => {
+      const now = new Date();
+      const nextToday = toDayString(now);
+      const nextMonth = startOfMonthLocal(now);
+
+      if (!active) return;
+      setTodayDay(nextToday);
+      setMonthDate((current) => current ?? nextMonth);
+    };
     const refresh = async () => {
       const next = await getAllDays();
       if (!active) return;
@@ -90,17 +109,27 @@ export default function HomePage() {
       setHydrated(true);
     };
 
+    syncToday();
     void refresh();
+    const interval = window.setInterval(syncToday, 60_000);
+    window.addEventListener("focus", syncToday);
     window.addEventListener("focus", refresh);
     return () => {
       active = false;
+      window.clearInterval(interval);
+      window.removeEventListener("focus", syncToday);
       window.removeEventListener("focus", refresh);
     };
   }, []);
 
-  const streak = useMemo(() => computeStreak(records), [records]);
+  const streak = useMemo(() => {
+    if (!todayDay) return 0;
+    return computeStreak(records, dateFromDayString(todayDay));
+  }, [records, todayDay]);
 
   const monthStats = useMemo(() => {
+    if (!monthDate) return { sessions: 0, minutes: 0, avg: 0 };
+
     const key = monthKey(monthDate);
     const inMonth = records.filter((r) => r.day.startsWith(key));
     const sessionsList = inMonth.flatMap((record) => record.sessions);
@@ -330,7 +359,7 @@ export default function HomePage() {
           <div className="glass-panel p-1.5 flex items-center justify-between gap-1.5">
             <button
               type="button"
-              onClick={() => setMonthDate((prev) => addMonths(prev, -1))}
+              onClick={() => setMonthDate((prev) => addMonths(prev ?? new Date(), -1))}
               className="glass-button glass-button-muted"
               aria-label="Mes anterior"
             >
@@ -340,14 +369,14 @@ export default function HomePage() {
             </button>
             <button
               type="button"
-              onClick={() => setMonthDate(startOfMonthLocal(new Date()))}
+              onClick={goToToday}
               className="glass-button glass-button-primary flex-1"
             >
               Hoy
             </button>
             <button
               type="button"
-              onClick={() => setMonthDate((prev) => addMonths(prev, 1))}
+              onClick={() => setMonthDate((prev) => addMonths(prev ?? new Date(), 1))}
               className="glass-button glass-button-muted"
               aria-label="Mes siguiente"
             >
@@ -357,13 +386,17 @@ export default function HomePage() {
             </button>
           </div>
 
-          <CalendarGrid
-            monthDate={monthDate}
-            records={hydrated ? records : []}
-            todayDay={todayDay}
-            onDayClick={onDayClick}
-            onDayLongPress={onDayLongPress}
-          />
+          {monthDate && todayDay ? (
+            <CalendarGrid
+              monthDate={monthDate}
+              records={hydrated ? records : []}
+              todayDay={todayDay}
+              onDayClick={onDayClick}
+              onDayLongPress={onDayLongPress}
+            />
+          ) : (
+            <div className="glass-panel p-4 text-sm muted">Cargando calendario...</div>
+          )}
 
           <button
             type="button"

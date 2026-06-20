@@ -9,7 +9,11 @@ import {
   type ActiveTimerSession,
 } from "@/lib/timerSession";
 
-const PRESETS = [5, 10, 15, 20];
+const PRESETS = [5, 10, 15, 30];
+
+function normalizeMinutes(value: number) {
+  return Number.isFinite(value) ? Math.max(1, Math.round(value)) : 10;
+}
 
 function formatSeconds(s: number) {
   const m = Math.floor(s / 60);
@@ -18,13 +22,18 @@ function formatSeconds(s: number) {
 }
 
 export default function TimerCard({
+  initialMinutes = 10,
+  highlightedMinutes,
   onFinish,
   onMinutesChange,
 }: {
+  initialMinutes?: number;
+  highlightedMinutes?: number;
   onFinish?: (payload: { minutes: number; finishedAt: number; sessionId: string }) => Promise<void> | void;
   onMinutesChange?: (minutes: number) => void;
 }) {
-  const [minutes, setMinutes] = useState<number>(10);
+  const normalizedInitialMinutes = normalizeMinutes(initialMinutes);
+  const [minutes, setMinutes] = useState<number>(normalizedInitialMinutes);
   const [secondsLeft, setSecondsLeft] = useState<number>(minutes * 60);
   const [running, setRunning] = useState(false);
   const [finishStatus, setFinishStatus] = useState<"idle" | "saving" | "error">("idle");
@@ -132,6 +141,14 @@ export default function TimerCard({
       // si ni así, simplemente no bloqueamos el finish
     }
   }, [ensureAudioContextAndBuffer]);
+
+  useEffect(() => {
+    if (running || finishStatus !== "idle" || activeTimerRef.current) return;
+
+    setMinutes(normalizedInitialMinutes);
+    setSecondsLeft(normalizedInitialMinutes * 60);
+    onMinutesChange?.(normalizedInitialMinutes);
+  }, [finishStatus, normalizedInitialMinutes, onMinutesChange, running]);
 
   const restoreFromActiveTimer = useCallback(() => {
     const active = getActiveTimer();
@@ -277,25 +294,31 @@ export default function TimerCard({
       </div>
 
       <div className="flex gap-2 mt-4 flex-wrap">
-        {PRESETS.map((p) => (
-          <button
-            key={p}
-            onClick={() => {
-              if (running || completionPending) return;
-              setMinutes(p);
-              setSecondsLeft(p * 60);
-              onMinutesChange?.(p);
-            }}
-            className={[
-              "glass-button text-sm",
-              minutes === p ? "glass-button-primary" : "glass-button-muted",
-              running || completionPending ? "opacity-45 cursor-not-allowed" : "",
-            ].join(" ")}
-            disabled={running || completionPending}
-          >
-            {p} min
-          </button>
-        ))}
+        {PRESETS.map((p) => {
+          const isRecoveryTarget = highlightedMinutes === p;
+
+          return (
+            <button
+              key={p}
+              onClick={() => {
+                if (running || completionPending) return;
+                setMinutes(p);
+                setSecondsLeft(p * 60);
+                onMinutesChange?.(p);
+              }}
+              className={[
+                "glass-button text-sm",
+                minutes === p ? "glass-button-primary" : "glass-button-muted",
+                isRecoveryTarget ? "glass-button-recovery" : "",
+                running || completionPending ? "opacity-45 cursor-not-allowed" : "",
+              ].join(" ")}
+              disabled={running || completionPending}
+              title={isRecoveryTarget ? "Recuperar racha con 30 min" : undefined}
+            >
+              {p} min
+            </button>
+          );
+        })}
 
         <input
           type="number"

@@ -5,7 +5,7 @@ import CalendarGrid from "@/components/CalendarGrid";
 import StreakHeader from "@/components/StreakHeader";
 import TimeBackground from "@/components/TimeBackground";
 import { toDayString } from "@/lib/dates";
-import { computeStreak } from "@/lib/streak";
+import { computeStreak, getStreakRecovery } from "@/lib/streak";
 import {
   addSession,
   deleteSession,
@@ -125,6 +125,11 @@ export default function HomePage() {
   const streak = useMemo(() => {
     if (!todayDay) return 0;
     return computeStreak(records, dateFromDayString(todayDay));
+  }, [records, todayDay]);
+
+  const streakRecovery = useMemo(() => {
+    if (!todayDay) return null;
+    return getStreakRecovery(records, todayDay);
   }, [records, todayDay]);
 
   const monthStats = useMemo(() => {
@@ -336,6 +341,26 @@ export default function HomePage() {
           </div>
 
           <StreakHeader streak={hydrated ? streak : 0} />
+
+          {hydrated && streakRecovery?.available ? (
+            <div className="recovery-panel p-3">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-xs muted">Racha recuperable</div>
+                  <div className="glass-title text-base font-semibold mt-1">
+                    Recupera la racha con 30 min.
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={goToTimer}
+                  className="glass-button glass-button-recovery px-3 py-2 text-sm"
+                >
+                  Cronómetro
+                </button>
+              </div>
+            </div>
+          ) : null}
 
           <div className="glass-panel p-3">
             <div className="text-xs muted">Este mes</div>

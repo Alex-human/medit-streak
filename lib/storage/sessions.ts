@@ -1,4 +1,5 @@
 import { Capacitor } from "@capacitor/core";
+import { addDays } from "@/lib/dates";
 import { MeditCloudStore } from "@/lib/native/meditCloudStore";
 
 export type MeditationSession = {
@@ -31,6 +32,7 @@ type LegacyDayRecord = {
 const KEY = "medit_streak_days_v2";
 const LEGACY_KEY = "medit_streak_days_v1";
 const DEVICE_KEY = "medit_streak_device_id_v1";
+const CLOUD_TIMEOUT_MS = 1_500;
 
 function parseVersion(value: unknown) {
   if (typeof value !== "string") return null;
@@ -231,6 +233,25 @@ function hasWindow() {
   return typeof window !== "undefined";
 }
 
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      reject(new Error("Cloud store operation timed out."));
+    }, timeoutMs);
+
+    promise.then(
+      (value) => {
+        clearTimeout(timeout);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timeout);
+        reject(error);
+      },
+    );
+  });
+}
+
 function isNativeStoreAvailable() {
   return hasWindow() && Capacitor.isNativePlatform() && Capacitor.isPluginAvailable("MeditCloudStore");
 }
@@ -335,7 +356,7 @@ async function readRemoteRaw(): Promise<string | null> {
   if (!isNativeStoreAvailable()) return null;
 
   try {
-    const { value } = await MeditCloudStore.get({ key: KEY });
+    const { value } = await withTimeout(MeditCloudStore.get({ key: KEY }), CLOUD_TIMEOUT_MS);
     return value ?? null;
   } catch {
     return null;
@@ -346,7 +367,7 @@ async function readLegacyRemoteRaw(): Promise<string | null> {
   if (!isNativeStoreAvailable()) return null;
 
   try {
-    const { value } = await MeditCloudStore.get({ key: LEGACY_KEY });
+    const { value } = await withTimeout(MeditCloudStore.get({ key: LEGACY_KEY }), CLOUD_TIMEOUT_MS);
     return value ?? null;
   } catch {
     return null;
@@ -357,7 +378,7 @@ async function writeRemoteRaw(raw: string) {
   if (!isNativeStoreAvailable()) return;
 
   try {
-    await MeditCloudStore.set({ key: KEY, value: raw });
+    await withTimeout(MeditCloudStore.set({ key: KEY, value: raw }), CLOUD_TIMEOUT_MS);
   } catch {
     // noop
   }
@@ -367,7 +388,7 @@ async function removeLegacyRemoteRaw() {
   if (!isNativeStoreAvailable()) return;
 
   try {
-    await MeditCloudStore.remove({ key: LEGACY_KEY });
+    await withTimeout(MeditCloudStore.remove({ key: LEGACY_KEY }), CLOUD_TIMEOUT_MS);
   } catch {
     // noop
   }
@@ -421,9 +442,13 @@ async function loadAllMap(): Promise<DayMap> {
 async function saveAllMap(map: DayMap) {
   const latest = await loadAllMap();
   const merged = mergeMaps(latest, map);
-  const raw = stringifyMap(merged);
+  await persistMap(merged);
+}
+
+async function persistMap(map: DayMap) {
+  const raw = stringifyMap(map);
   writeLocalRaw(raw);
-  await writeRemoteRaw(raw);
+  void writeRemoteRaw(raw);
 }
 
 function mergeSessions(...groups: MeditationSession[][]): MeditationSession[] {
@@ -439,6 +464,27 @@ function mergeSessions(...groups: MeditationSession[][]): MeditationSession[] {
       }, new Map<string, MeditationSession>())
       .values(),
   ).sort((a, b) => a.createdAt - b.createdAt);
+}
+
+function addSessionToMap(map: DayMap, day: string, minutes: number, createdAt: number, sessionId: string): DayRecord {
+  const latestDay = map[day];
+  const version = makeVersion(getNextDayCounter(latestDay), getDeviceId());
+  const session: MeditationSession = {
+    id: sessionId,
+    minutes: Math.max(1, Math.round(minutes)),
+    createdAt,
+    version,
+  };
+
+  const next = buildDayRecord(
+    day,
+    mergeSessions(latestDay?.sessions ?? [], [session]),
+    Math.max(latestDay?.updatedAt ?? 0, getVersionCounter(version)),
+    latestDay?.tombstones ?? {},
+  );
+  map[day] = next;
+
+  return next;
 }
 
 export async function getAllDays(): Promise<DayRecord[]> {
@@ -470,25 +516,12 @@ export async function addSession(
 ): Promise<DayRecord> {
   for (let attempt = 0; attempt < 2; attempt += 1) {
     const latestMap = await loadAllMap();
-    const latestDay = latestMap[day];
-    const version = makeVersion(getNextDayCounter(latestDay), getDeviceId());
-    const session: MeditationSession = {
-      id: sessionId,
-      minutes: Math.max(1, Math.round(minutes)),
-      createdAt,
-      version,
-    };
-    const next = buildDayRecord(
-      day,
-      mergeSessions(latestDay?.sessions ?? [], [session]),
-      Math.max(latestDay?.updatedAt ?? 0, getVersionCounter(version)),
-      latestDay?.tombstones ?? {},
-    );
-    latestMap[day] = next;
+    const next = addSessionToMap(latestMap, day, minutes, createdAt, sessionId);
     await saveAllMap(latestMap);
 
     const verified = await getDay(day);
-    if (verified?.sessions.some((existing) => existing.id === session.id && existing.version === version)) {
+    const savedSession = next.sessions.find((session) => session.id === sessionId);
+    if (savedSession && verified?.sessions.some((existing) => existing.id === savedSession.id && existing.version === savedSession.version)) {
       return verified;
     }
   }
@@ -496,6 +529,78 @@ export async function addSession(
   const fallback = await getDay(day);
   if (fallback?.sessions.some((session) => session.id === sessionId)) {
     return fallback;
+  }
+
+  throw new Error(`No se pudo guardar la sesión de meditación para ${day}.`);
+}
+
+export async function addTimerSessionWithRecovery(
+  day: string,
+  minutes: number,
+  createdAt: number,
+  sessionId: string,
+  recoveryMinutes: number,
+): Promise<{ day: DayRecord; recoveredDay: DayRecord | null }> {
+  const normalizedMinutes = Math.max(1, Math.round(minutes));
+  const missedDay = addDays(day, -1);
+  const anchorDay = addDays(day, -2);
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const latestMap = await loadAllMap();
+    const shouldRecover =
+      normalizedMinutes >= recoveryMinutes &&
+      !(latestMap[missedDay]?.completed ?? false) &&
+      (latestMap[anchorDay]?.completed ?? false);
+
+    const savedDay = addSessionToMap(latestMap, day, normalizedMinutes, createdAt, sessionId);
+    const savedRecoveryDay = shouldRecover
+      ? addSessionToMap(
+          latestMap,
+          missedDay,
+          recoveryMinutes,
+          createdAt,
+          `${sessionId}-recovery-${missedDay}`,
+        )
+      : null;
+
+    await persistMap(latestMap);
+
+    const verifiedMap = await loadAllMap();
+    const verifiedDay = verifiedMap[day];
+    const verifiedRecoveryDay = savedRecoveryDay ? verifiedMap[missedDay] : null;
+    const savedSession = savedDay.sessions.find((session) => session.id === sessionId);
+    const savedRecoverySession = savedRecoveryDay?.sessions.find((session) => session.id === `${sessionId}-recovery-${missedDay}`);
+    const dayVerified =
+      Boolean(savedSession) &&
+      Boolean(
+        verifiedDay?.sessions.some(
+          (session) => session.id === savedSession?.id && session.version === savedSession?.version,
+        ),
+      );
+    const recoveryVerified =
+      !savedRecoveryDay ||
+      (Boolean(savedRecoverySession) &&
+        Boolean(
+          verifiedRecoveryDay?.sessions.some(
+            (session) => session.id === savedRecoverySession?.id && session.version === savedRecoverySession?.version,
+          ),
+        ));
+
+    if (dayVerified && recoveryVerified && verifiedDay) {
+      return {
+        day: verifiedDay,
+        recoveredDay: verifiedRecoveryDay ?? null,
+      };
+    }
+  }
+
+  const fallbackMap = await loadAllMap();
+  const fallbackDay = fallbackMap[day];
+  if (fallbackDay?.sessions.some((session) => session.id === sessionId)) {
+    return {
+      day: fallbackDay,
+      recoveredDay: fallbackMap[missedDay] ?? null,
+    };
   }
 
   throw new Error(`No se pudo guardar la sesión de meditación para ${day}.`);

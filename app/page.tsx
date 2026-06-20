@@ -14,6 +14,7 @@ import {
   type DayRecord,
   type MeditationSession,
 } from "@/lib/storage/sessions";
+import { saveDueActiveTimer } from "@/lib/timerCompletion";
 import { useRouter } from "next/navigation";
 
 function startOfMonthLocal(d: Date) {
@@ -103,6 +104,12 @@ export default function HomePage() {
       setMonthDate((current) => current ?? nextMonth);
     };
     const refresh = async () => {
+      try {
+        await saveDueActiveTimer();
+      } catch {
+        // El cronómetro seguirá disponible para reintentar el guardado desde su pantalla.
+      }
+
       const next = await getAllDays();
       if (!active) return;
       setRecords(next);

@@ -7,7 +7,8 @@ import TimerCard from "@/components/TimerCard";
 import TimeBackground from "@/components/TimeBackground";
 import { toDayString } from "@/lib/dates";
 import { getStreakRecovery, STREAK_RECOVERY_MINUTES } from "@/lib/streak";
-import { addSession, getAllDays } from "@/lib/storage/sessions";
+import { getAllDays } from "@/lib/storage/sessions";
+import { saveCompletedTimer } from "@/lib/timerCompletion";
 
 export default function TimerPage() {
   const router = useRouter();
@@ -40,21 +41,16 @@ export default function TimerPage() {
     finishedAt: number;
     sessionId: string;
   }) {
-    const day = toDayString(new Date(finishedAt));
-    const records = await getAllDays();
-    const recovery = getStreakRecovery(records, day);
-    const shouldRecoverStreak = recovery.available && minutes >= STREAK_RECOVERY_MINUTES;
-
-    await addSession(day, minutes, finishedAt, sessionId);
-
-    if (shouldRecoverStreak) {
-      await addSession(
-        recovery.missedDay,
-        STREAK_RECOVERY_MINUTES,
-        finishedAt,
-        `${sessionId}-recovery-${recovery.missedDay}`,
-      );
-    }
+    await saveCompletedTimer(
+      {
+        id: sessionId,
+        minutes,
+        startedAt: finishedAt - minutes * 60_000,
+        endAt: finishedAt,
+        completedAt: finishedAt,
+      },
+      finishedAt,
+    );
 
     router.push("/");
   }

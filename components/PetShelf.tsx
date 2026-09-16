@@ -4,53 +4,23 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useCloud } from "./CloudProvider";
 import PetAvatar from "./PetAvatar";
+import PetCollectionCard from "./PetCollectionCard";
+import PetKindRail from "./PetKindRail";
 import { loadSocialSnapshot, type PetCardData } from "@/lib/cloud/social";
-
-function moodCopy(card: PetCardData) {
-  const friendName = card.friend.display_name;
-  const meDone = card.life.ownersDoneToday.includes(card.currentUserId);
-  if (card.life.mood === "feliz") return `Hoy la habéis cuidado los dos.`;
-  if (card.life.mood === "esperando") return meDone ? `Esperando a ${friendName}.` : `${friendName} ya ha meditado. Te espera.`;
-  if (card.life.mood === "recuperable") return "Recupérala hoy con 30 min.";
-  if (card.life.mood === "peligro") return card.life.rescueDaysLeft === 0 ? "Último día: sálvala con 60 min." : `${card.life.rescueDaysLeft} días para salvarla con 60 min.`;
-  if (card.life.mood === "fallecida") return "Su historia queda con vosotros.";
-  return "Aún está descansando hoy.";
-}
-
-function PetCard({ card, celebration = false }: { card: PetCardData; celebration?: boolean }) {
-  return (
-    <article className={celebration ? "celebration-pet" : "pet-card"}>
-      <PetAvatar
-        seed={card.pet.id}
-        stage={card.life.stage}
-        mood={card.life.mood}
-        size={celebration ? "large" : "normal"}
-      />
-      <div className={celebration ? "text-center" : "min-w-0 flex-1"}>
-        <div className="flex items-center gap-2 justify-between">
-          <h3 className="glass-title font-semibold truncate">{card.pet.name}</h3>
-          <span className="pet-stage-label">{card.life.stage}</span>
-        </div>
-        <p className="text-[11px] muted mt-0.5 truncate">con {card.friend.display_name}</p>
-        <p className="text-xs mt-2 leading-5">{moodCopy(card)}</p>
-        <div className="pet-bond mt-2"><span style={{ width: `${Math.min(100, (card.life.bondDays / 21) * 100)}%` }} /></div>
-        <p className="text-[10px] muted mt-1">{card.life.bondDays} días de vínculo</p>
-      </div>
-    </article>
-  );
-}
+import type { PetKind } from "@/lib/social/domain";
 
 export default function PetShelf({ celebrate, onCelebrationClose }: { celebrate: boolean; onCelebrationClose: () => void }) {
   const { user } = useCloud();
   const [pets, setPets] = useState<PetCardData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [emptySelected, setEmptySelected] = useState<PetKind>("fuego");
 
   const refresh = useCallback(async () => {
     if (!user) return;
     setError(null);
     try {
-      setPets((await loadSocialSnapshot()).pets.filter((card) => card.life.mood !== "fallecida"));
+      setPets((await loadSocialSnapshot()).pets);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "No se pudieron cargar tus mascotas.");
     } finally {
@@ -77,23 +47,29 @@ export default function PetShelf({ celebrate, onCelebrationClose }: { celebrate:
             <div className="text-xs muted">Tus mascotas</div>
             <div className="glass-title text-lg font-semibold mt-0.5">El jardín de hoy</div>
           </div>
-          <Link href="/friends" className="glass-button glass-button-muted px-3 py-2 text-xs">
-            Amigos
-          </Link>
+          <div className="flex gap-2">
+            <Link href="/pets" className="glass-button glass-button-primary px-3 py-2 text-xs">Mascotas</Link>
+            <Link href="/friends" className="glass-button glass-button-muted px-3 py-2 text-xs">Amigos</Link>
+          </div>
         </div>
 
         {loading ? <div className="pet-shelf-loading mt-3" aria-label="Cargando mascotas" /> : null}
         {!loading && error ? <p className="form-error mt-3">{error}</p> : null}
         {!loading && !error && pets.length === 0 ? (
-          <div className="pet-empty mt-3">
-            <PetAvatar seed="first-pet" stage="semilla" mood="dormida" size="small" />
-            <div>
-              <p className="text-sm font-semibold">Tu primera criatura está por nacer.</p>
-              <Link href="/friends" className="text-xs underline underline-offset-4 mt-1 inline-block">Añade a un amigo</Link>
+          <div className="pet-empty pet-empty-pandilla mt-3">
+            <PetAvatar kind={emptySelected} stage="origen" mood="dormida" size="small" />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold">La pandilla espera a vuestro vínculo.</p>
+              <p className="text-[11px] muted mt-1">Las cuatro criaturas nacerán juntas al criar con un amigo.</p>
+              <PetKindRail selected={emptySelected} onSelect={setEmptySelected} stage="origen" mood="dormida" compact />
+              <div className="flex gap-3 mt-2">
+                <Link href="/pets" className="text-xs underline underline-offset-4">Ver evoluciones</Link>
+                <Link href="/friends" className="text-xs underline underline-offset-4">Añadir amigo</Link>
+              </div>
             </div>
           </div>
         ) : null}
-        {pets.length > 0 ? <div className="pet-row mt-3">{pets.map((card) => <PetCard key={card.pet.id} card={card} />)}</div> : null}
+        {pets.length > 0 ? <div className="pet-row mt-3">{pets.map((card) => <PetCollectionCard key={card.pet.id} card={card} />)}</div> : null}
       </section>
 
       {celebrate && !loading && pets.length > 0 ? (
@@ -104,7 +80,7 @@ export default function PetShelf({ celebrate, onCelebrationClose }: { celebrate:
               <div className="glass-chip inline-flex">Meditación completada</div>
               <h2 className="glass-title text-2xl font-semibold mt-3">Tu calma ha llegado hasta ellas</h2>
             </div>
-            <div className="celebration-row mt-4">{pets.map((card) => <PetCard key={card.pet.id} card={card} celebration />)}</div>
+            <div className="celebration-row mt-4">{pets.map((card) => <PetCollectionCard key={card.pet.id} card={card} celebration />)}</div>
             <button type="button" onClick={onCelebrationClose} className="glass-button glass-button-primary w-full mt-5 py-3">Volver al jardín</button>
           </section>
         </div>

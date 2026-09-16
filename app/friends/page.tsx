@@ -14,8 +14,10 @@ import {
   respondToFriendship,
   updateMyProfile,
   type FriendConnection,
+  type PetCardData,
   type SocialSnapshot,
 } from "@/lib/cloud/social";
+import { fallenPetKinds, PET_DETAILS, PET_KINDS } from "@/lib/social/domain";
 
 const EMPTY: SocialSnapshot = { incoming: [], outgoing: [], friends: [], pets: [] };
 
@@ -165,10 +167,11 @@ export default function FriendsPage() {
                 <FriendCard
                   key={connection.friendship.id}
                   connection={connection}
+                  petCard={snapshot.pets.find((card) => card.pet.id === connection.activePet?.id)}
                   petName={petNames[connection.friendship.id] ?? ""}
                   onPetName={(value) => setPetNames((current) => ({ ...current, [connection.friendship.id]: value }))}
                   working={workingId === connection.friendship.id}
-                  onCreate={() => void run(connection.friendship.id, () => createSharedPet(connection.friendship.id, petNames[connection.friendship.id] ?? ""), "La criatura ha nacido.")}
+                  onCreate={() => void run(connection.friendship.id, () => createSharedPet(connection.friendship.id, petNames[connection.friendship.id] ?? ""), "La pandilla ha despertado.")}
                   onRemove={() => {
                     if (!window.confirm(`¿Eliminar tu amistad con ${connection.friend.display_name}? También se eliminará vuestra mascota compartida.`)) return;
                     void run(connection.friendship.id, () => removeFriendship(connection.friendship.id), "Amistad eliminada.");
@@ -187,7 +190,10 @@ export default function FriendsPage() {
   );
 }
 
-function FriendCard({ connection, petName, onPetName, working, onCreate, onRemove }: { connection: FriendConnection; petName: string; onPetName: (value: string) => void; working: boolean; onCreate: () => void; onRemove: () => void }) {
+function FriendCard({ connection, petCard, petName, onPetName, working, onCreate, onRemove }: { connection: FriendConnection; petCard?: PetCardData; petName: string; onPetName: (value: string) => void; working: boolean; onCreate: () => void; onRemove: () => void }) {
+  const stage = petCard?.life.stage ?? "origen";
+  const fallenKinds = petCard ? fallenPetKinds(petCard.pet.id, petCard.life.fallenCount) : [];
+
   return (
     <article className="friend-card">
       <div className="flex items-center gap-3">
@@ -196,14 +202,18 @@ function FriendCard({ connection, petName, onPetName, working, onCreate, onRemov
         <button type="button" onClick={onRemove} className="text-[11px] muted underline underline-offset-4">Eliminar</button>
       </div>
       {connection.activePet ? (
-        <div className="friend-pet mt-3">
-          <PetAvatar seed={connection.activePet.id} stage="semilla" mood="dormida" size="small" />
-          <div><p className="text-sm font-semibold">{connection.activePet.name}</p><p className="text-[11px] muted">Vuestra criatura compartida</p></div>
+        <div className="friend-pet friend-pet-pandilla mt-3">
+          <div className="friend-pet-miniatures">
+            {PET_KINDS.map((kind) => (
+              <PetAvatar key={kind} kind={kind} stage={stage} mood={fallenKinds.includes(kind) ? "fallecida" : petCard?.life.mood ?? "dormida"} size="tiny" />
+            ))}
+          </div>
+          <div><p className="text-sm font-semibold">Pandilla «{connection.activePet.name}»</p><p className="text-[11px] muted">{PET_KINDS.map((kind) => PET_DETAILS[kind].name).join(" · ")}</p></div>
         </div>
       ) : (
         <div className="mt-3 flex gap-2">
-          <input className="glass-input flex-1 min-w-0" maxLength={24} placeholder="Nombre de la mascota" value={petName} onChange={(event) => onPetName(event.target.value)} />
-          <button type="button" disabled={working || !petName.trim()} onClick={onCreate} className="glass-button glass-button-primary px-3 text-xs">{working ? "Naciendo..." : "Criar"}</button>
+          <input className="glass-input flex-1 min-w-0" maxLength={24} placeholder="Nombre de vuestra pandilla" value={petName} onChange={(event) => onPetName(event.target.value)} />
+          <button type="button" disabled={working || !petName.trim()} onClick={onCreate} className="glass-button glass-button-primary px-3 text-xs">{working ? "Despertando..." : "Despertar"}</button>
         </div>
       )}
       {connection.pastPets.length > 0 ? <p className="text-[10px] muted mt-2">{connection.pastPets.length} {connection.pastPets.length === 1 ? "criatura en vuestro recuerdo" : "criaturas en vuestro recuerdo"}</p> : null}

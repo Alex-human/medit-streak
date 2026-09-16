@@ -113,12 +113,6 @@ export async function loadSocialSnapshot(): Promise<SocialSnapshot> {
       hatchedDay: pet.hatched_day,
       todayDay,
     });
-
-    if (life.deathDay) {
-      const { error } = await client.from("pets").update({ died_on: life.deathDay }).eq("id", pet.id).is("died_on", null);
-      if (!error) pet.died_on = life.deathDay;
-    }
-
     petCards.push({ pet, friend: connection.friend, life, currentUserId: userId });
   }
 

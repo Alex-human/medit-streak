@@ -86,7 +86,7 @@ describe("shared pet life", () => {
     expect(rescued.mood).toBe("esperando");
   });
 
-  it("dies only after the five rescue days have elapsed", () => {
+  it("drops one creature per fatal streak incident after the five rescue days", () => {
     const sessions = [session("alex", "2026-09-14"), session("amiga", "2026-09-14")];
     const lastChance = computePetLife({
       sessions,
@@ -102,16 +102,44 @@ describe("shared pet life", () => {
     });
 
     expect(lastChance.mood).toBe("peligro");
-    expect(dead.mood).toBe("fallecida");
-    expect(dead.deathDay).toBe("2026-09-22");
+    expect(dead.fallenCount).toBe(2);
+    expect(dead.mood).toBe("peligro");
+  });
+
+  it("revives one fallen creature with each later 60 minute timer session", () => {
+    const base = [session("alex", "2026-09-14"), session("amiga", "2026-09-14")];
+    const fallen = computePetLife({ sessions: base, ownerIds: owners, hatchedDay: "2026-09-14", todayDay: "2026-09-22" });
+    const revived = computePetLife({
+      sessions: [...base, session("alex", "2026-09-22", 60)],
+      ownerIds: owners,
+      hatchedDay: "2026-09-14",
+      todayDay: "2026-09-22",
+    });
+
+    expect(fallen.fallenCount).toBe(2);
+    expect(revived.fallenCount).toBe(1);
+  });
+
+  it("marks the whole four-creature collection as fallen after four fatal incidents", () => {
+    const life = computePetLife({
+      sessions: [session("alex", "2026-09-01"), session("amiga", "2026-09-01")],
+      ownerIds: owners,
+      hatchedDay: "2026-09-01",
+      todayDay: "2026-09-11",
+    });
+
+    expect(life.fallenCount).toBe(4);
+    expect(life.mood).toBe("fallecida");
   });
 });
 
 describe("pet stages", () => {
-  it("uses the four compact evolution thresholds", () => {
-    expect(petStageForBond(0)).toBe("semilla");
-    expect(petStageForBond(3)).toBe("brote");
-    expect(petStageForBond(7)).toBe("lumo");
-    expect(petStageForBond(21)).toBe("guardián");
+  it("uses all six evolution thresholds", () => {
+    expect(petStageForBond(0)).toBe("origen");
+    expect(petStageForBond(3)).toBe("cría");
+    expect(petStageForBond(7)).toBe("curiosa");
+    expect(petStageForBond(14)).toBe("radiante");
+    expect(petStageForBond(30)).toBe("mítica");
+    expect(petStageForBond(60)).toBe("guardiana");
   });
 });

@@ -37,8 +37,11 @@ export default function FriendsPage() {
 
   useEffect(() => {
     if (!cloud.profile) return;
-    setHandle(cloud.profile.handle);
-    setDisplayName(cloud.profile.display_name);
+    const timer = window.setTimeout(() => {
+      setHandle(cloud.profile?.handle ?? "");
+      setDisplayName(cloud.profile?.display_name ?? "");
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [cloud.profile]);
 
   const refresh = useCallback(async () => {
@@ -54,7 +57,8 @@ export default function FriendsPage() {
   }, [cloud.user]);
 
   useEffect(() => {
-    void refresh();
+    const timer = window.setTimeout(() => void refresh(), 0);
+    return () => window.clearTimeout(timer);
   }, [refresh]);
 
   async function run(id: string, action: () => Promise<void>, success: string) {

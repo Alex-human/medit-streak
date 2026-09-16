@@ -59,9 +59,12 @@ export default function PetShelf({ celebrate, onCelebrationClose }: { celebrate:
   }, [user]);
 
   useEffect(() => {
-    void refresh();
+    const timer = window.setTimeout(() => void refresh(), 0);
     window.addEventListener("focus", refresh);
-    return () => window.removeEventListener("focus", refresh);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("focus", refresh);
+    };
   }, [refresh]);
 
   if (!user) return null;

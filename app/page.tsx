@@ -87,10 +87,12 @@ export default function HomePage() {
   const [celebratePets, setCelebratePets] = useState(false);
 
   useEffect(() => {
-    if (sessionStorage.getItem("medit_show_pet_celebration") === "1") {
+    const timer = window.setTimeout(() => {
+      if (sessionStorage.getItem("medit_show_pet_celebration") !== "1") return;
       sessionStorage.removeItem("medit_show_pet_celebration");
       setCelebratePets(true);
-    }
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   function goToTimer() {
@@ -379,7 +381,14 @@ export default function HomePage() {
 
           <StreakHeader streak={hydrated ? streak : 0} />
 
-          {cloud.error ? <div className="error-panel px-3 py-2 text-xs">{cloud.error}</div> : null}
+          {cloud.error ? (
+            <div className="error-panel px-3 py-2 text-xs flex items-center justify-between gap-3">
+              <span>{cloud.error}</span>
+              <button type="button" onClick={() => void cloud.retrySync()} className="underline underline-offset-4 shrink-0">
+                Reintentar
+              </button>
+            </div>
+          ) : null}
 
           <PetShelf celebrate={celebratePets} onCelebrationClose={() => setCelebratePets(false)} />
 

@@ -213,11 +213,6 @@ export default function TimerCard({
   }, [onFinish, playGong]);
 
   useEffect(() => {
-    const pending = restoreFromActiveTimer();
-    if (pending) {
-      void handleFinish(pending.timer, pending.finishedAt);
-    }
-
     const sync = () => {
       const nextPending = restoreFromActiveTimer();
       if (nextPending) {
@@ -225,11 +220,13 @@ export default function TimerCard({
       }
     };
 
+    const timer = window.setTimeout(sync, 0);
     window.addEventListener("focus", sync);
     document.addEventListener("visibilitychange", sync);
     window.addEventListener("pageshow", sync);
 
     return () => {
+      window.clearTimeout(timer);
       window.removeEventListener("focus", sync);
       document.removeEventListener("visibilitychange", sync);
       window.removeEventListener("pageshow", sync);
@@ -268,7 +265,7 @@ export default function TimerCard({
   }, [running, getRemainingSeconds, handleFinish]);
 
   const label = useMemo(() => formatSeconds(secondsLeft), [secondsLeft]);
-  const completionPending = finishStatus !== "idle" || Boolean(activeTimerRef.current?.completedAt);
+  const completionPending = finishStatus !== "idle";
 
   return (
     <div className="glass-panel p-4">

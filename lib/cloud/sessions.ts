@@ -131,10 +131,9 @@ export async function deleteCloudSession(day: string, clientId: string) {
   return (await getCloudDays()).find((record) => record.day === day) ?? null;
 }
 
-export async function importLocalDays(records: DayRecord[]) {
+export async function importLocalDays(records: DayRecord[], userId: string) {
   const client = getCloudClient();
   if (!client) return;
-  const userId = await currentUser();
   const rows = records.flatMap((record) =>
     record.sessions
     .filter((session) => !session.id.endsWith(`-recovery-${record.day}`))

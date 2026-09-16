@@ -9,7 +9,7 @@ import {
   type ActiveTimerSession,
 } from "@/lib/timerSession";
 
-const PRESETS = [5, 10, 15, 30];
+const PRESETS = [5, 10, 15, 30, 60];
 
 function normalizeMinutes(value: number) {
   return Number.isFinite(value) ? Math.max(1, Math.round(value)) : 10;

@@ -1,7 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type TouchEvent } from "react";
+import Link from "next/link";
+import AuthScreen from "@/components/AuthScreen";
 import CalendarGrid from "@/components/CalendarGrid";
+import { useCloud } from "@/components/CloudProvider";
+import PetShelf from "@/components/PetShelf";
 import StreakHeader from "@/components/StreakHeader";
 import TimeBackground from "@/components/TimeBackground";
 import { toDayString } from "@/lib/dates";
@@ -13,7 +17,7 @@ import {
   updateSession,
   type DayRecord,
   type MeditationSession,
-} from "@/lib/storage/sessions";
+} from "@/lib/storage/repository";
 import { saveDueActiveTimer } from "@/lib/timerCompletion";
 import { useRouter } from "next/navigation";
 
@@ -61,6 +65,7 @@ type SessionEditorState = {
 
 export default function HomePage() {
   const router = useRouter();
+  const cloud = useCloud();
   const [monthDate, setMonthDate] = useState<Date | null>(null);
   const [todayDay, setTodayDay] = useState<string | null>(null);
   const [records, setRecords] = useState<DayRecord[]>([]);
@@ -79,6 +84,14 @@ export default function HomePage() {
   const [pendingDeleteSessionId, setPendingDeleteSessionId] = useState<string | null>(null);
   const swipeStartRef = useRef<{ x: number; y: number; at: number } | null>(null);
   const navigatingRef = useRef(false);
+  const [celebratePets, setCelebratePets] = useState(false);
+
+  useEffect(() => {
+    if (sessionStorage.getItem("medit_show_pet_celebration") === "1") {
+      sessionStorage.removeItem("medit_show_pet_celebration");
+      setCelebratePets(true);
+    }
+  }, []);
 
   function goToTimer() {
     if (navigatingRef.current) return;
@@ -127,7 +140,7 @@ export default function HomePage() {
       window.removeEventListener("focus", syncToday);
       window.removeEventListener("focus", refresh);
     };
-  }, []);
+  }, [cloud.user?.id]);
 
   const streak = useMemo(() => {
     if (!todayDay) return 0;
@@ -332,6 +345,19 @@ export default function HomePage() {
     }
   }
 
+  if (cloud.loading) {
+    return (
+      <>
+        <TimeBackground />
+        <main className="app-shell min-h-[100dvh] flex items-center">
+          <div className="app-frame w-full"><div className="glass-panel p-5 muted text-sm">Preparando tu jardín...</div></div>
+        </main>
+      </>
+    );
+  }
+
+  if (cloud.configured && !cloud.user) return <AuthScreen />;
+
   return (
     <>
       <TimeBackground />
@@ -343,11 +369,19 @@ export default function HomePage() {
                 <div className="glass-title text-2xl font-semibold">Medit Streak</div>
                 <div className="text-xs muted mt-1">Respira, vuelve al presente, y suma continuidad.</div>
               </div>
-              <div className="glass-chip">Offline</div>
+              {cloud.user ? (
+                <Link href="/friends" className="glass-chip hover:translate-y-[-1px] transition-transform">Amigos</Link>
+              ) : (
+                <div className="glass-chip">Local</div>
+              )}
             </div>
           </div>
 
           <StreakHeader streak={hydrated ? streak : 0} />
+
+          {cloud.error ? <div className="error-panel px-3 py-2 text-xs">{cloud.error}</div> : null}
+
+          <PetShelf celebrate={celebratePets} onCelebrationClose={() => setCelebratePets(false)} />
 
           {hydrated && streakRecovery?.available ? (
             <div className="recovery-panel p-3">

@@ -1,6 +1,6 @@
 import { toDayString } from "@/lib/dates";
 import { STREAK_RECOVERY_MINUTES } from "@/lib/streak";
-import { addTimerSessionWithRecovery } from "@/lib/storage/sessions";
+import { addTimerSessionWithRecovery } from "@/lib/storage/repository";
 import {
   clearActiveTimer,
   getActiveTimer,

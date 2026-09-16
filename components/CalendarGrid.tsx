@@ -8,7 +8,7 @@ import {
   weekdayIndexMondayFirst,
   toDayString,
 } from "@/lib/dates";
-import type { DayRecord } from "@/lib/storage/sessions";
+import type { DayRecord } from "@/lib/storage/repository";
 
 export default function CalendarGrid({
   monthDate,

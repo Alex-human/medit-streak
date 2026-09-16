@@ -5,14 +5,20 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import TimerCard from "@/components/TimerCard";
 import TimeBackground from "@/components/TimeBackground";
+import AuthScreen from "@/components/AuthScreen";
+import { useCloud } from "@/components/CloudProvider";
+import { loadSocialSnapshot } from "@/lib/cloud/social";
 import { toDayString } from "@/lib/dates";
 import { getStreakRecovery, STREAK_RECOVERY_MINUTES } from "@/lib/streak";
-import { getAllDays } from "@/lib/storage/sessions";
+import { PET_RESCUE_MINUTES } from "@/lib/social/domain";
+import { getAllDays } from "@/lib/storage/repository";
 import { saveCompletedTimer } from "@/lib/timerCompletion";
 
 export default function TimerPage() {
   const router = useRouter();
+  const cloud = useCloud();
   const [recoveryAvailable, setRecoveryAvailable] = useState(false);
+  const [petRescueAvailable, setPetRescueAvailable] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -21,6 +27,14 @@ export default function TimerPage() {
       const records = await getAllDays();
       if (!active) return;
       setRecoveryAvailable(getStreakRecovery(records, toDayString(new Date())).available);
+      if (cloud.user) {
+        try {
+          const snapshot = await loadSocialSnapshot();
+          if (active) setPetRescueAvailable(snapshot.pets.some((card) => card.life.mood === "peligro"));
+        } catch {
+          if (active) setPetRescueAvailable(false);
+        }
+      }
     };
 
     void syncRecovery();
@@ -30,7 +44,7 @@ export default function TimerPage() {
       active = false;
       window.removeEventListener("focus", syncRecovery);
     };
-  }, []);
+  }, [cloud.user]);
 
   async function onFinish({
     minutes,
@@ -52,8 +66,16 @@ export default function TimerPage() {
       finishedAt,
     );
 
+    sessionStorage.setItem("medit_show_pet_celebration", "1");
     router.push("/");
   }
+
+  if (cloud.loading) {
+    return <><TimeBackground /><main className="app-shell"><div className="app-frame"><div className="glass-panel p-5 muted">Preparando el cronómetro...</div></div></main></>;
+  }
+  if (cloud.configured && !cloud.user) return <AuthScreen />;
+
+  const targetMinutes = petRescueAvailable ? PET_RESCUE_MINUTES : recoveryAvailable ? STREAK_RECOVERY_MINUTES : 10;
 
   return (
     <>
@@ -75,7 +97,7 @@ export default function TimerPage() {
             <div className="text-sm muted mt-1">Silencio guiado por tiempo real, incluso en segundo plano.</div>
           </div>
 
-          {recoveryAvailable ? (
+          {recoveryAvailable && !petRescueAvailable ? (
             <div className="recovery-panel p-4">
               <div className="text-xs muted">Racha recuperable</div>
               <div className="glass-title text-lg font-semibold mt-1">
@@ -84,15 +106,26 @@ export default function TimerPage() {
             </div>
           ) : null}
 
+          {petRescueAvailable ? (
+            <div className="danger-panel p-4">
+              <div className="text-xs muted">Una mascota está en peligro</div>
+              <div className="glass-title text-lg font-semibold mt-1">
+                Completa 60 min para salvar tus mascotas.
+              </div>
+            </div>
+          ) : null}
+
           <TimerCard
-            initialMinutes={recoveryAvailable ? STREAK_RECOVERY_MINUTES : 10}
-            highlightedMinutes={recoveryAvailable ? STREAK_RECOVERY_MINUTES : undefined}
+            initialMinutes={targetMinutes}
+            highlightedMinutes={petRescueAvailable ? PET_RESCUE_MINUTES : recoveryAvailable ? STREAK_RECOVERY_MINUTES : undefined}
             onFinish={onFinish}
           />
 
           <div className="glass-panel p-4 text-sm muted">
-            {recoveryAvailable
-              ? "Al terminar 30 min, se marcarán hoy y ayer."
+            {petRescueAvailable
+              ? "Una hora completada hoy protege todas tus mascotas que estén en peligro."
+              : recoveryAvailable
+                ? "Al terminar 30 min, se marcarán hoy y ayer."
               : "Al terminar, se marcará “hoy” como meditado y volverás al inicio."}
           </div>
         </div>

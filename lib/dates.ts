@@ -1,10 +1,4 @@
-function localTimeZone(): string {
-  try {
-    return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
-  } catch {
-    return "UTC";
-  }
-}
+const APP_TIME_ZONE = "Europe/Madrid";
 
 function datePartsFromIntl(d: Date, timeZone: string): { year: string; month: string; day: string } | null {
   try {
@@ -26,8 +20,8 @@ function datePartsFromIntl(d: Date, timeZone: string): { year: string; month: st
 }
 
 export function toDayString(d: Date): string {
-  // YYYY-MM-DD en hora local usando zona horaria real del dispositivo.
-  const parts = datePartsFromIntl(d, localTimeZone());
+  // Una racha compartida necesita un único corte diario para todos los amigos.
+  const parts = datePartsFromIntl(d, APP_TIME_ZONE);
   if (parts) return `${parts.year}-${parts.month}-${parts.day}`;
 
   // fallback para runtimes con soporte Intl limitado
@@ -39,9 +33,9 @@ export function toDayString(d: Date): string {
 
 export function addDays(dayStr: string, delta: number): string {
   const [y, m, d] = dayStr.split("-").map(Number);
-  const date = new Date(y, m - 1, d);
-  date.setDate(date.getDate() + delta);
-  return toDayString(date);
+  const date = new Date(Date.UTC(y, m - 1, d));
+  date.setUTCDate(date.getUTCDate() + delta);
+  return date.toISOString().slice(0, 10);
 }
 
 export function startOfMonth(d: Date): Date {
@@ -61,7 +55,7 @@ export function weekdayIndexMondayFirst(d: Date): number {
 export function formatMonthYear(d: Date): string {
   try {
     return new Intl.DateTimeFormat("es-ES", {
-      timeZone: localTimeZone(),
+      timeZone: APP_TIME_ZONE,
       calendar: "gregory",
       month: "long",
       year: "numeric",

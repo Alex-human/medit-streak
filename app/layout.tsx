@@ -1,5 +1,6 @@
 import "./globals.css";
 import type { Metadata } from "next";
+import CloudProvider from "@/components/CloudProvider";
 
 export const metadata: Metadata = {
   title: "Medit Streak",
@@ -34,7 +35,7 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body>{children}</body>
+      <body><CloudProvider>{children}</CloudProvider></body>
     </html>
   );
 }

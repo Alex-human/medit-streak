@@ -1,4 +1,4 @@
-import type { DayRecord } from "./storage/sessions";
+import type { DayRecord } from "./storage/repository";
 import { addDays, toDayString } from "./dates";
 
 export const STREAK_RECOVERY_MINUTES = 30;

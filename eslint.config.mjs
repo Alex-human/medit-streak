@@ -13,6 +13,8 @@ const eslintConfig = defineConfig([
     "build/**",
     "next-env.d.ts",
     "ios/**",
+    // Salida de `vercel build`, no es código del proyecto.
+    ".vercel/**",
   ]),
 ]);
 

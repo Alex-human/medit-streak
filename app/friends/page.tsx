@@ -1,13 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import AuthScreen from "@/components/AuthScreen";
 import { useCloud } from "@/components/CloudProvider";
 import PetAvatar from "@/components/PetAvatar";
 import TimeBackground from "@/components/TimeBackground";
 import {
-  createSharedPet,
+  ensureSharedPet,
   loadSocialSnapshot,
   removeFriendship,
   requestFriend,
@@ -17,7 +17,7 @@ import {
   type GardenCard,
   type SocialSnapshot,
 } from "@/lib/cloud/social";
-import { PET_KINDS } from "@/lib/social/domain";
+import { PET_KINDS, type PetState } from "@/lib/social/domain";
 
 const EMPTY: SocialSnapshot = { incoming: [], outgoing: [], friends: [], pets: [] };
 
@@ -33,8 +33,8 @@ export default function FriendsPage() {
   const [friendHandle, setFriendHandle] = useState("");
   const [handle, setHandle] = useState("");
   const [displayName, setDisplayName] = useState("");
-  const [petNames, setPetNames] = useState<Record<string, string>>({});
   const [notice, setNotice] = useState<string | null>(null);
+  const hatchedRef = useRef<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -50,7 +50,18 @@ export default function FriendsPage() {
     if (!cloud.user) return;
     setError(null);
     try {
-      setSnapshot(await loadSocialSnapshot());
+      const next = await loadSocialSnapshot();
+      setSnapshot(next);
+
+      // Las mascotas nacen solas al aceptar la amistad: nadie tiene que bautizarlas.
+      const pending = next.friends.filter(
+        (connection) => !connection.activePet && !hatchedRef.current.has(connection.friendship.id),
+      );
+      if (pending.length > 0) {
+        for (const connection of pending) hatchedRef.current.add(connection.friendship.id);
+        await Promise.all(pending.map((connection) => ensureSharedPet(connection.friendship.id)));
+        setSnapshot(await loadSocialSnapshot());
+      }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "No se pudieron cargar tus amistades.");
     } finally {
@@ -130,10 +141,6 @@ export default function FriendsPage() {
                   key={connection.friendship.id}
                   connection={connection}
                   garden={snapshot.pets.find((card) => card.pet.id === connection.activePet?.id)}
-                  petName={petNames[connection.friendship.id] ?? ""}
-                  onPetName={(value) => setPetNames((current) => ({ ...current, [connection.friendship.id]: value }))}
-                  working={workingId === connection.friendship.id}
-                  onCreate={() => void run(connection.friendship.id, () => createSharedPet(connection.friendship.id, petNames[connection.friendship.id] ?? ""), "La pandilla ha despertado.")}
                   onRemove={() => {
                     if (!window.confirm(`¿Eliminar tu amistad con ${connection.friend.display_name}? También se eliminará vuestra mascota compartida.`)) return;
                     void run(connection.friendship.id, () => removeFriendship(connection.friendship.id), "Amistad eliminada.");
@@ -202,8 +209,9 @@ export default function FriendsPage() {
   );
 }
 
-function FriendCard({ connection, garden, petName, onPetName, working, onCreate, onRemove }: { connection: FriendConnection; garden?: GardenCard; petName: string; onPetName: (value: string) => void; working: boolean; onCreate: () => void; onRemove: () => void }) {
-  const states = garden?.life.pets ?? PET_KINDS.map((kind) => ({ kind, stage: "origen" as const, mood: "dormida" as const }));
+function FriendCard({ connection, garden, onRemove }: { connection: FriendConnection; garden?: GardenCard; onRemove: () => void }) {
+  const states: Pick<PetState, "kind" | "stage" | "mood">[] =
+    garden?.life.pets ?? PET_KINDS.map((kind) => ({ kind, stage: "origen" as const, mood: "dormida" as const }));
 
   return (
     <article className="friend-card">
@@ -212,20 +220,21 @@ function FriendCard({ connection, garden, petName, onPetName, working, onCreate,
         <div className="min-w-0 flex-1"><p className="font-semibold truncate">{connection.friend.display_name}</p><p className="text-xs muted truncate">@{connection.friend.handle}</p></div>
         <button type="button" onClick={onRemove} className="text-[11px] muted underline underline-offset-4">Eliminar</button>
       </div>
-      {connection.activePet ? (
-        <div className="friend-pet mt-3">
-          <div className="friend-pet-miniatures">
-            {states.map((state) => (
-              <PetAvatar key={state.kind} kind={state.kind} stage={state.stage} mood={state.mood} size="tiny" />
-            ))}
-          </div>
+
+      <div className="friend-pet mt-3">
+        <p className="text-xs muted">Tus mascotas con {connection.friend.display_name}</p>
+        <div className="friend-pet-miniatures mt-2">
+          {states.map((state) => (
+            <PetAvatar key={state.kind} kind={state.kind} stage={state.stage} mood={state.mood} size="tiny" />
+          ))}
         </div>
-      ) : (
-        <div className="mt-3 flex gap-2">
-          <input className="glass-input flex-1 min-w-0" maxLength={24} placeholder="Nombre de vuestra pandilla" value={petName} onChange={(event) => onPetName(event.target.value)} />
-          <button type="button" disabled={working || !petName.trim()} onClick={onCreate} className="glass-button glass-button-primary px-3 text-xs">{working ? "Despertando..." : "Despertar"}</button>
-        </div>
-      )}
+        <Link
+          href={`/pets?con=${connection.friendship.id}`}
+          className="glass-button glass-button-primary block w-full text-center py-2 text-xs mt-3"
+        >
+          Mascotas
+        </Link>
+      </div>
     </article>
   );
 }

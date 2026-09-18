@@ -9,12 +9,10 @@ import type { CreatureEntry } from "@/lib/cloud/social";
 export default function PetCarousel({
   entries,
   size = "normal",
-  onActiveChange,
   label = "Tus mascotas",
 }: {
   entries: CreatureEntry[];
   size?: "normal" | "large";
-  onActiveChange?: (index: number) => void;
   label?: string;
 }) {
   const railRef = useRef<HTMLDivElement>(null);
@@ -47,15 +45,13 @@ export default function PetCarousel({
   }
 
   useEffect(() => {
-    syncActive();
+    // Tras pintar: si se sincroniza dentro del efecto React encadena renders.
+    const frame = window.requestAnimationFrame(syncActive);
     return () => {
+      window.cancelAnimationFrame(frame);
       if (frameRef.current !== null) window.cancelAnimationFrame(frameRef.current);
     };
   }, [syncActive, entries.length]);
-
-  useEffect(() => {
-    onActiveChange?.(Math.min(active, Math.max(0, entries.length - 1)));
-  }, [active, entries.length, onActiveChange]);
 
   function goTo(index: number) {
     const rail = railRef.current;

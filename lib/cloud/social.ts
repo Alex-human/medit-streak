@@ -167,6 +167,21 @@ export async function createSharedPet(friendshipId: string, name: string) {
   if (error) throw error;
 }
 
+/**
+ * Despierta la pandilla de una amistad si todavía no existe. Los dos amigos pueden
+ * llamarla a la vez: el índice único deja viva una sola, y la carrera perdida se ignora.
+ */
+export async function ensureSharedPet(friendshipId: string) {
+  try {
+    await createSharedPet(friendshipId, "Jardín compartido");
+    return true;
+  } catch (cause) {
+    const message = cause instanceof Error ? cause.message : String(cause);
+    if (message.includes("mascota viva")) return false;
+    throw cause;
+  }
+}
+
 export async function updateMyProfile(handle: string, displayName: string) {
   const { client, userId } = await requireClient();
   const normalizedHandle = handle.trim().toLowerCase().replace(/^@/, "").replace(/[^a-z0-9_]/g, "_");

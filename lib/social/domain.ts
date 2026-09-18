@@ -16,11 +16,11 @@ export const PET_DETAILS: Record<PetKind, { name: string; title: string; descrip
 
 export const PET_STAGES = [
   { id: "origen", label: "Origen", minBondDays: 0 },
-  { id: "cría", label: "Cría", minBondDays: 3 },
-  { id: "curiosa", label: "Curiosa", minBondDays: 7 },
-  { id: "radiante", label: "Radiante", minBondDays: 14 },
-  { id: "mítica", label: "Mítica", minBondDays: 30 },
-  { id: "guardiana", label: "Guardiana", minBondDays: 60 },
+  { id: "cría", label: "Cría", minBondDays: 10 },
+  { id: "curiosa", label: "Curiosa", minBondDays: 50 },
+  { id: "radiante", label: "Radiante", minBondDays: 70 },
+  { id: "mítica", label: "Mítica", minBondDays: 100 },
+  { id: "guardiana", label: "Guardiana", minBondDays: 200 },
 ] as const;
 
 export type SocialSession = {

@@ -150,9 +150,9 @@ describe("shared pet life", () => {
     expect(life.fallenCount).toBe(0);
     expect(revived?.bornDay).toBe("2026-01-15");
     expect(revived?.bondDays).toBe(6);
-    expect(revived?.stage).toBe("cría");
+    expect(revived?.stage).toBe("origen");
     expect(veterans).toHaveLength(3);
-    expect(veterans.every((pet) => pet.bondDays === 19 && pet.stage === "radiante")).toBe(true);
+    expect(veterans.every((pet) => pet.bondDays === 19 && pet.stage === "cría")).toBe(true);
   });
 
   it("marks the four creatures as fallen after four fatal incidents", () => {
@@ -172,10 +172,11 @@ describe("shared pet life", () => {
 describe("pet stages", () => {
   it("uses all six evolution thresholds", () => {
     expect(petStageForBond(0)).toBe("origen");
-    expect(petStageForBond(3)).toBe("cría");
-    expect(petStageForBond(7)).toBe("curiosa");
-    expect(petStageForBond(14)).toBe("radiante");
-    expect(petStageForBond(30)).toBe("mítica");
-    expect(petStageForBond(60)).toBe("guardiana");
+    expect(petStageForBond(9)).toBe("origen");
+    expect(petStageForBond(10)).toBe("cría");
+    expect(petStageForBond(50)).toBe("curiosa");
+    expect(petStageForBond(70)).toBe("radiante");
+    expect(petStageForBond(100)).toBe("mítica");
+    expect(petStageForBond(200)).toBe("guardiana");
   });
 });

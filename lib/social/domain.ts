@@ -10,7 +10,7 @@ export type PetKind = (typeof PET_KINDS)[number];
 export const PET_DETAILS: Record<PetKind, { name: string; title: string; description: string }> = {
   fuego: { name: "Chispa", title: "Espíritu de fuego", description: "Crece de una brasa tímida a un pequeño sol guardián." },
   agua: { name: "Glú", title: "Gota de hielo", description: "Cada etapa la vuelve más cristalina, hasta dominar el hielo." },
-  bosque: { name: "Tilo", title: "Guardián del bosque", description: "Un brote de madera que echa raíces, ramas y una gran copa." },
+  bosque: { name: "Tilo", title: "Guardián del bosque", description: "Una bellota que echa raíces, ramas y una gran copa." },
   nube: { name: "Nimbo", title: "Nube de los sueños", description: "Aprende a llover, hacer arcoíris y guardar pequeñas estrellas." },
 };
 
@@ -33,9 +33,23 @@ export type SocialSession = {
 export type PetStage = (typeof PET_STAGES)[number]["id"];
 export type PetMood = "dormida" | "esperando" | "feliz" | "recuperable" | "peligro" | "fallecida";
 
-export type PetLife = {
-  mood: PetMood;
+/** Estado individual de una criatura: cada una vive, muere y evoluciona por su cuenta. */
+export type PetState = {
+  kind: PetKind;
+  alive: boolean;
+  /** Día en el que nació o revivió: el vínculo se cuenta desde aquí. */
+  bornDay: string;
+  diedDay: string | null;
+  bondDays: number;
   stage: PetStage;
+  mood: PetMood;
+};
+
+export type GardenLife = {
+  pets: PetState[];
+  /** Ánimo compartido por las criaturas vivas. */
+  mood: PetMood;
+  /** Vínculo de la criatura viva más veterana. */
   bondDays: number;
   ownersDoneToday: string[];
   endangeredUserId: string | null;
@@ -49,6 +63,8 @@ type MissedDay = {
   rescuedBy: "streak" | "pet" | null;
   rescueDeadline: string;
 };
+
+type LifeEvent = { day: string; type: "death" | "revival" };
 
 function dayRange(start: string, end: string) {
   const days: string[] = [];
@@ -98,25 +114,27 @@ export function petStageForBond(bondDays: number): PetStage {
     .find((stage) => bondDays >= stage.minBondDays)?.id ?? "origen";
 }
 
-export function fallenPetKinds(seed: string, fallenCount: number) {
+/** Orden estable en el que caen las criaturas de un jardín concreto. */
+export function petKindOrder(seed: string) {
   let hash = 0;
   for (const char of seed) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
   const offset = hash % PET_KINDS.length;
-  const orderedKinds = [...PET_KINDS.slice(offset), ...PET_KINDS.slice(0, offset)];
-  return orderedKinds.slice(0, Math.min(PET_KINDS.length, Math.max(0, fallenCount)));
+  return [...PET_KINDS.slice(offset), ...PET_KINDS.slice(0, offset)];
 }
 
-export function computePetLife({
+export function computeGardenLife({
   sessions,
   ownerIds,
   hatchedDay,
   todayDay,
+  seed = hatchedDay,
 }: {
   sessions: SocialSession[];
   ownerIds: [string, string];
   hatchedDay: string;
   todayDay: string;
-}): PetLife {
+  seed?: string;
+}): GardenLife {
   const perOwner = ownerIds.map((ownerId) => ({
     ownerId,
     ...incidentsForUser(sessions, ownerId, hatchedDay, todayDay),
@@ -127,6 +145,7 @@ export function computePetLife({
     .filter((incident) => incident.rescuedBy === null)
     .sort((left, right) => left.day.localeCompare(right.day));
   const revivedIncidents = new Set<(typeof candidates)[number]>();
+  const revivalDays: string[] = [];
   const rescueSessions = sessions
     .map((session, index) => ({ session, index }))
     .filter(({ session }) => ownerIds.includes(session.userId) && session.source === "timer" && session.minutes >= PET_RESCUE_MINUTES)
@@ -138,6 +157,7 @@ export function computePetLife({
     );
     if (fallen) {
       revivedIncidents.add(fallen);
+      revivalDays.push(session.day);
       continue;
     }
 
@@ -154,8 +174,9 @@ export function computePetLife({
   const unresolved = candidates.filter(
     (incident) => incident.rescuedBy === null && !revivedIncidents.has(incident),
   );
-  const fallenIncidents = unresolved.filter((incident) => todayDay > incident.rescueDeadline);
-  const fallenCount = Math.min(PET_KINDS.length, fallenIncidents.length);
+  const fatalIncidents = candidates.filter(
+    (incident) => incident.rescuedBy === null && incident.rescueDeadline < todayDay,
+  );
   const danger = unresolved.find(
     (incident) => todayDay >= addDays(incident.day, 2) && todayDay <= incident.rescueDeadline,
   );
@@ -178,54 +199,73 @@ export function computePetLife({
     };
   });
 
-  let bondDays = 0;
-  for (const day of dayRange(hatchedDay, todayDay)) {
-    if (protectedByOwner.every(({ protectedDays }) => protectedDays.has(day))) bondDays += 1;
+  const bondedDays = dayRange(hatchedDay, todayDay).filter((day) =>
+    protectedByOwner.every(({ protectedDays }) => protectedDays.has(day)),
+  );
+
+  // Cada muerte se lleva a la siguiente criatura del orden; cada rescate de 60 min
+  // devuelve a la última que cayó, y esa vuelve a empezar desde la primera fase.
+  const events: LifeEvent[] = [
+    ...fatalIncidents.map((incident) => ({ day: addDays(incident.rescueDeadline, 1), type: "death" as const })),
+    ...revivalDays.map((day) => ({ day, type: "revival" as const })),
+  ].sort((left, right) => left.day.localeCompare(right.day) || (left.type === "death" ? -1 : 1));
+
+  const timeline = petKindOrder(seed).map((kind) => ({
+    kind,
+    alive: true,
+    bornDay: hatchedDay,
+    diedDay: null as string | null,
+  }));
+  let fallenCount = 0;
+  for (const event of events) {
+    if (event.type === "death") {
+      const victim = timeline[fallenCount];
+      if (!victim) continue;
+      victim.alive = false;
+      victim.diedDay = event.day;
+      fallenCount += 1;
+      continue;
+    }
+    const revived = timeline[fallenCount - 1];
+    if (!revived) continue;
+    revived.alive = true;
+    revived.diedDay = null;
+    revived.bornDay = event.day;
+    fallenCount -= 1;
   }
 
-  const shared = {
-    stage: petStageForBond(bondDays),
-    bondDays,
-    ownersDoneToday,
-    fallenCount,
-  };
+  const mood: PetMood = danger
+    ? "peligro"
+    : grace
+      ? "recuperable"
+      : ownersDoneToday.length === 2
+        ? "feliz"
+        : ownersDoneToday.length === 1
+          ? "esperando"
+          : "dormida";
 
-  if (fallenCount === PET_KINDS.length) {
-    return {
-      ...shared,
-      mood: "fallecida",
-      endangeredUserId: fallenIncidents[0]?.ownerId ?? null,
-      rescueDeadline: fallenIncidents[0]?.rescueDeadline ?? null,
-      rescueDaysLeft: 0,
-    };
-  }
+  const pets: PetState[] = timeline.map((pet) => {
+    if (!pet.alive) {
+      return { ...pet, bondDays: 0, stage: "origen" as PetStage, mood: "fallecida" as PetMood };
+    }
+    const bondDays = bondedDays.filter((day) => day >= pet.bornDay).length;
+    return { ...pet, bondDays, stage: petStageForBond(bondDays), mood };
+  });
 
-  if (danger) {
-    const remaining = Math.max(0, Math.round((Date.parse(`${danger.rescueDeadline}T00:00:00Z`) - Date.parse(`${todayDay}T00:00:00Z`)) / 86_400_000));
-    return {
-      ...shared,
-      mood: "peligro",
-      endangeredUserId: danger.ownerId,
-      rescueDeadline: danger.rescueDeadline,
-      rescueDaysLeft: remaining,
-    };
-  }
-
-  if (grace) {
-    return {
-      ...shared,
-      mood: "recuperable",
-      endangeredUserId: grace.ownerId,
-      rescueDeadline: grace.rescueDeadline,
-      rescueDaysLeft: PET_RESCUE_DAYS,
-    };
-  }
+  const rescueDaysLeft = danger
+    ? Math.max(0, Math.round((Date.parse(`${danger.rescueDeadline}T00:00:00Z`) - Date.parse(`${todayDay}T00:00:00Z`)) / 86_400_000))
+    : grace
+      ? PET_RESCUE_DAYS
+      : null;
 
   return {
-    ...shared,
-    mood: ownersDoneToday.length === 2 ? "feliz" : ownersDoneToday.length === 1 ? "esperando" : "dormida",
-    endangeredUserId: null,
-    rescueDeadline: null,
-    rescueDaysLeft: null,
+    pets,
+    mood,
+    bondDays: pets.reduce((best, pet) => (pet.alive ? Math.max(best, pet.bondDays) : best), 0),
+    ownersDoneToday,
+    endangeredUserId: danger?.ownerId ?? grace?.ownerId ?? null,
+    rescueDeadline: danger?.rescueDeadline ?? grace?.rescueDeadline ?? null,
+    rescueDaysLeft,
+    fallenCount,
   };
 }

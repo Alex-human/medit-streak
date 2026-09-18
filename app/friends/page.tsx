@@ -14,10 +14,10 @@ import {
   respondToFriendship,
   updateMyProfile,
   type FriendConnection,
-  type PetCardData,
+  type GardenCard,
   type SocialSnapshot,
 } from "@/lib/cloud/social";
-import { fallenPetKinds, PET_DETAILS, PET_KINDS } from "@/lib/social/domain";
+import { PET_KINDS } from "@/lib/social/domain";
 
 const EMPTY: SocialSnapshot = { incoming: [], outgoing: [], friends: [], pets: [] };
 
@@ -107,67 +107,29 @@ export default function FriendsPage() {
       <TimeBackground />
       <main className="app-shell">
         <div className="app-frame soft-reveal">
-          <header className="glass-panel p-4">
-            <div className="flex items-center justify-between gap-3">
-              <Link href="/" className="glass-button glass-button-muted px-3 py-2 text-sm">← Jardín</Link>
-              <button type="button" onClick={() => void cloud.signOut()} className="text-xs muted underline underline-offset-4">Cerrar sesión</button>
-            </div>
-            <h1 className="glass-title text-3xl font-semibold mt-4">Amigos</h1>
-            <p className="text-sm muted mt-1">Cada amistad puede cuidar una criatura compartida.</p>
-          </header>
+          <div className="flex items-center justify-between gap-3">
+            <Link href="/" className="glass-button glass-button-muted px-3 py-2 text-sm">← Jardín</Link>
+            <h1 className="glass-title text-lg font-semibold">Amigos</h1>
+          </div>
 
           {notice ? <div className="success-panel px-4 py-3 text-sm">{notice}</div> : null}
           {error ? <div className="error-panel px-4 py-3 text-sm">{error}</div> : null}
 
           <section className="glass-panel p-4">
-            <div className="text-xs muted">Tu identidad</div>
-            <form onSubmit={(event) => void saveProfile(event)} className="mt-3 grid gap-3">
-              <label className="text-xs muted">
-                Nombre visible
-                <input className="glass-input w-full mt-1.5" value={displayName} maxLength={40} onChange={(event) => setDisplayName(event.target.value)} />
-              </label>
-              <label className="text-xs muted">
-                Alias para encontrarte
-                <div className="relative mt-1.5"><span className="input-prefix">@</span><input className="glass-input w-full pl-8" value={handle} minLength={3} maxLength={24} pattern="[a-z0-9_]+" onChange={(event) => setHandle(event.target.value.toLowerCase().replace(/[^a-z0-9_]/g, "_"))} /></div>
-              </label>
-              <button disabled={workingId === "profile"} className="glass-button glass-button-muted py-2.5 text-sm">{workingId === "profile" ? "Guardando..." : "Guardar perfil"}</button>
-            </form>
-          </section>
-
-          <section className="glass-panel p-4">
-            <div className="text-xs muted">Añadir a alguien</div>
-            <h2 className="glass-title text-lg font-semibold mt-1">Buscar por alias</h2>
-            <form onSubmit={(event) => void submitFriend(event)} className="flex gap-2 mt-3">
-              <div className="relative flex-1"><span className="input-prefix">@</span><input className="glass-input w-full pl-8" placeholder="alias" value={friendHandle} onChange={(event) => setFriendHandle(event.target.value)} /></div>
-              <button disabled={!friendHandle.trim() || workingId === "new-friend"} className="glass-button glass-button-primary px-4">{workingId === "new-friend" ? "..." : "Enviar"}</button>
-            </form>
-          </section>
-
-          {snapshot.incoming.length > 0 ? (
-            <section className="glass-panel p-4">
-              <div className="text-xs muted">Solicitudes</div>
-              <div className="mt-3 space-y-2">
-                {snapshot.incoming.map((connection) => (
-                  <div key={connection.friendship.id} className="friend-row">
-                    <div className="friend-avatar">{initials(connection.friend.display_name)}</div>
-                    <div className="min-w-0 flex-1"><p className="font-semibold truncate">{connection.friend.display_name}</p><p className="text-xs muted">@{connection.friend.handle}</p></div>
-                    <button onClick={() => void run(connection.friendship.id, () => respondToFriendship(connection.friendship.id, true), "Ya sois amigos.")} className="glass-button glass-button-primary px-3 py-2 text-xs">Aceptar</button>
-                    <button aria-label="Rechazar solicitud" onClick={() => void run(connection.friendship.id, () => respondToFriendship(connection.friendship.id, false), "Solicitud rechazada.")} className="glass-button glass-button-muted px-3 py-2 text-xs">×</button>
-                  </div>
-                ))}
+            <div className="flex items-end justify-between">
+              <div>
+                <div className="text-xs muted">Tu círculo</div>
+                <h2 className="glass-title text-lg font-semibold mt-1">{snapshot.friends.length} {snapshot.friends.length === 1 ? "amistad" : "amistades"}</h2>
               </div>
-            </section>
-          ) : null}
-
-          <section className="glass-panel p-4">
-            <div className="flex items-end justify-between"><div><div className="text-xs muted">Tu círculo</div><h2 className="glass-title text-lg font-semibold mt-1">{snapshot.friends.length} {snapshot.friends.length === 1 ? "amistad" : "amistades"}</h2></div>{loading ? <span className="text-xs muted">Actualizando...</span> : null}</div>
-            {!loading && snapshot.friends.length === 0 ? <p className="text-sm muted mt-3">Todavía no hay amistades aceptadas. Envía tu alias o busca el de otra persona.</p> : null}
+              {loading ? <span className="text-xs muted">Actualizando...</span> : null}
+            </div>
+            {!loading && snapshot.friends.length === 0 ? <p className="text-sm muted mt-3">Todavía no hay amistades aceptadas. Busca a alguien por su alias.</p> : null}
             <div className="mt-3 space-y-3">
               {snapshot.friends.map((connection) => (
                 <FriendCard
                   key={connection.friendship.id}
                   connection={connection}
-                  petCard={snapshot.pets.find((card) => card.pet.id === connection.activePet?.id)}
+                  garden={snapshot.pets.find((card) => card.pet.id === connection.activePet?.id)}
                   petName={petNames[connection.friendship.id] ?? ""}
                   onPetName={(value) => setPetNames((current) => ({ ...current, [connection.friendship.id]: value }))}
                   working={workingId === connection.friendship.id}
@@ -181,34 +143,82 @@ export default function FriendsPage() {
             </div>
           </section>
 
+          {snapshot.incoming.length > 0 ? (
+            <section className="glass-panel p-4">
+              <div className="text-xs muted">Solicitudes</div>
+              <div className="mt-3 space-y-2">
+                {snapshot.incoming.map((connection) => (
+                  <div key={connection.friendship.id} className="friend-row">
+                    <div className="friend-avatar">{initials(connection.friend.display_name)}</div>
+                    <div className="min-w-0 flex-1"><p className="font-semibold truncate">{connection.friend.display_name}</p><p className="text-xs muted truncate">@{connection.friend.handle}</p></div>
+                    <button onClick={() => void run(connection.friendship.id, () => respondToFriendship(connection.friendship.id, true), "Ya sois amigos.")} className="glass-button glass-button-primary px-3 py-2 text-xs">Aceptar</button>
+                    <button aria-label="Rechazar solicitud" onClick={() => void run(connection.friendship.id, () => respondToFriendship(connection.friendship.id, false), "Solicitud rechazada.")} className="glass-button glass-button-muted px-3 py-2 text-xs">×</button>
+                  </div>
+                ))}
+              </div>
+            </section>
+          ) : null}
+
+          <section className="glass-panel p-4">
+            <div className="text-xs muted">Buscar a alguien</div>
+            <form onSubmit={(event) => void submitFriend(event)} className="flex gap-2 mt-3">
+              <label className="glass-field flex-1 min-w-0">
+                <span aria-hidden="true">@</span>
+                <input className="glass-field-input" placeholder="alias" aria-label="Alias de tu amigo" value={friendHandle} onChange={(event) => setFriendHandle(event.target.value)} />
+              </label>
+              <button disabled={!friendHandle.trim() || workingId === "new-friend"} className="glass-button glass-button-primary px-4">{workingId === "new-friend" ? "..." : "Enviar"}</button>
+            </form>
+          </section>
+
           {snapshot.outgoing.length > 0 ? (
             <section className="glass-panel-soft p-4"><div className="text-xs muted">Pendientes</div>{snapshot.outgoing.map((connection) => <p key={connection.friendship.id} className="text-sm mt-2">Esperando a <strong>{connection.friend.display_name}</strong> · @{connection.friend.handle}</p>)}</section>
           ) : null}
+
+          <details className="glass-panel disclosure">
+            <summary>
+              <span>Tu identidad</span>
+              <span className="disclosure-mark" aria-hidden="true">▾</span>
+            </summary>
+            <form onSubmit={(event) => void saveProfile(event)} className="grid gap-3 px-4 pb-4">
+              <label className="text-xs muted">
+                Nombre visible
+                <input className="glass-input w-full mt-1.5" value={displayName} maxLength={40} onChange={(event) => setDisplayName(event.target.value)} />
+              </label>
+              <label className="text-xs muted">
+                Alias para encontrarte
+                <span className="glass-field mt-1.5">
+                  <span aria-hidden="true">@</span>
+                  <input className="glass-field-input" value={handle} minLength={3} maxLength={24} pattern="[a-z0-9_]+" aria-label="Tu alias" onChange={(event) => setHandle(event.target.value.toLowerCase().replace(/[^a-z0-9_]/g, "_"))} />
+                </span>
+              </label>
+              <button disabled={workingId === "profile"} className="glass-button glass-button-muted py-2.5 text-sm">{workingId === "profile" ? "Guardando..." : "Guardar perfil"}</button>
+            </form>
+          </details>
+
+          <button type="button" onClick={() => void cloud.signOut()} className="text-xs muted underline underline-offset-4 py-2">Cerrar sesión</button>
         </div>
       </main>
     </>
   );
 }
 
-function FriendCard({ connection, petCard, petName, onPetName, working, onCreate, onRemove }: { connection: FriendConnection; petCard?: PetCardData; petName: string; onPetName: (value: string) => void; working: boolean; onCreate: () => void; onRemove: () => void }) {
-  const stage = petCard?.life.stage ?? "origen";
-  const fallenKinds = petCard ? fallenPetKinds(petCard.pet.id, petCard.life.fallenCount) : [];
+function FriendCard({ connection, garden, petName, onPetName, working, onCreate, onRemove }: { connection: FriendConnection; garden?: GardenCard; petName: string; onPetName: (value: string) => void; working: boolean; onCreate: () => void; onRemove: () => void }) {
+  const states = garden?.life.pets ?? PET_KINDS.map((kind) => ({ kind, stage: "origen" as const, mood: "dormida" as const }));
 
   return (
     <article className="friend-card">
       <div className="flex items-center gap-3">
         <div className="friend-avatar">{initials(connection.friend.display_name)}</div>
-        <div className="min-w-0 flex-1"><p className="font-semibold truncate">{connection.friend.display_name}</p><p className="text-xs muted">@{connection.friend.handle}</p></div>
+        <div className="min-w-0 flex-1"><p className="font-semibold truncate">{connection.friend.display_name}</p><p className="text-xs muted truncate">@{connection.friend.handle}</p></div>
         <button type="button" onClick={onRemove} className="text-[11px] muted underline underline-offset-4">Eliminar</button>
       </div>
       {connection.activePet ? (
-        <div className="friend-pet friend-pet-pandilla mt-3">
+        <div className="friend-pet mt-3">
           <div className="friend-pet-miniatures">
-            {PET_KINDS.map((kind) => (
-              <PetAvatar key={kind} kind={kind} stage={stage} mood={fallenKinds.includes(kind) ? "fallecida" : petCard?.life.mood ?? "dormida"} size="tiny" />
+            {states.map((state) => (
+              <PetAvatar key={state.kind} kind={state.kind} stage={state.stage} mood={state.mood} size="tiny" />
             ))}
           </div>
-          <div><p className="text-sm font-semibold">Pandilla «{connection.activePet.name}»</p><p className="text-[11px] muted">{PET_KINDS.map((kind) => PET_DETAILS[kind].name).join(" · ")}</p></div>
         </div>
       ) : (
         <div className="mt-3 flex gap-2">
@@ -216,7 +226,6 @@ function FriendCard({ connection, petCard, petName, onPetName, working, onCreate
           <button type="button" disabled={working || !petName.trim()} onClick={onCreate} className="glass-button glass-button-primary px-3 text-xs">{working ? "Despertando..." : "Despertar"}</button>
         </div>
       )}
-      {connection.pastPets.length > 0 ? <p className="text-[10px] muted mt-2">{connection.pastPets.length} {connection.pastPets.length === 1 ? "criatura en vuestro recuerdo" : "criaturas en vuestro recuerdo"}</p> : null}
     </article>
   );
 }

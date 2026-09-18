@@ -1,6 +1,6 @@
 import { getCloudClient, getSignedInUserId } from "./client";
 import { toDayString } from "@/lib/dates";
-import { computePetLife, type PetLife, type SocialSession } from "@/lib/social/domain";
+import { computeGardenLife, type GardenLife, type PetState, type SocialSession } from "@/lib/social/domain";
 import type { SocialProfile } from "@/components/CloudProvider";
 
 export type FriendshipRow = {
@@ -25,18 +25,26 @@ export type FriendConnection = {
   pastPets: PetRow[];
 };
 
-export type PetCardData = {
+/** Una pandilla compartida con un amigo: sus cuatro criaturas viven dentro de `life.pets`. */
+export type GardenCard = {
   pet: PetRow;
   friend: SocialProfile;
-  life: PetLife;
+  life: GardenLife;
   currentUserId: string;
 };
+
+/** Una criatura suelta lista para pintar: su estado y, si existe, la pandilla a la que pertenece. */
+export type CreatureEntry = { state: PetState; garden?: GardenCard };
+
+export function creatureEntries(gardens: GardenCard[]): CreatureEntry[] {
+  return gardens.flatMap((garden) => garden.life.pets.map((state) => ({ state, garden })));
+}
 
 export type SocialSnapshot = {
   incoming: FriendConnection[];
   outgoing: FriendConnection[];
   friends: FriendConnection[];
-  pets: PetCardData[];
+  pets: GardenCard[];
 };
 
 function friendId(friendship: FriendshipRow, currentUserId: string) {
@@ -104,14 +112,15 @@ export async function loadSocialSnapshot(): Promise<SocialSnapshot> {
     }];
   });
 
-  const petCards: PetCardData[] = [];
+  const petCards: GardenCard[] = [];
   for (const connection of connections.filter((item) => item.friendship.status === "accepted" && item.activePet)) {
     const pet = connection.activePet!;
-    const life = computePetLife({
+    const life = computeGardenLife({
       sessions,
       ownerIds: [userId, connection.friend.user_id],
       hatchedDay: pet.hatched_day,
       todayDay,
+      seed: pet.id,
     });
     petCards.push({ pet, friend: connection.friend, life, currentUserId: userId });
   }

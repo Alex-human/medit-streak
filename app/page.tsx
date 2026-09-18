@@ -318,7 +318,7 @@ export default function HomePage() {
 
   function onTouchStart(e: TouchEvent<HTMLElement>) {
     const target = e.target as HTMLElement | null;
-    if (target?.closest("button, a, input, textarea, select")) return;
+    if (target?.closest("button, a, input, textarea, select, [data-swipe-ignore]")) return;
     if (e.touches.length !== 1) return;
     const t = e.touches[0];
     swipeStartRef.current = {
@@ -366,13 +366,13 @@ export default function HomePage() {
       <main className="app-shell app-shell-fit touch-pan-y" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
         <div className="app-frame app-frame-fit soft-reveal">
           <div className="glass-panel p-3">
-            <div className="flex items-end justify-between gap-2">
-              <div>
-                <div className="glass-title text-2xl font-semibold">Medit Streak</div>
-                <div className="text-xs muted mt-1">Respira, vuelve al presente, y suma continuidad.</div>
-              </div>
+            <div className="flex items-center justify-between gap-2">
+              <div className="glass-title text-2xl font-semibold">Medit Streak</div>
               {cloud.user ? (
-                <Link href="/friends" className="glass-chip hover:translate-y-[-1px] transition-transform">Amigos</Link>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <Link href="/pets" className="glass-chip hover:translate-y-[-1px] transition-transform">Mascotas</Link>
+                  <Link href="/friends" className="glass-chip hover:translate-y-[-1px] transition-transform">Amigos</Link>
+                </div>
               ) : (
                 <div className="glass-chip">Local</div>
               )}

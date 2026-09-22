@@ -1,6 +1,19 @@
 import { getCloudClient, getSignedInUserId } from "./client";
 import { toDayString } from "@/lib/dates";
-import { computeGardenLife, type GardenLife, type PetState, type SocialSession } from "@/lib/social/domain";
+import { computePetLife, type PetLife, type SocialSession } from "@/lib/social/domain";
+import {
+  catalogItem,
+  dueChoices,
+  identityOf,
+  ownedItems,
+  type CatalogItem,
+  type ChoicePayload,
+  type ChoiceRow,
+  type DueChoice,
+  type Identity,
+  type Outfit,
+  type Slot,
+} from "@/lib/social/catalog";
 import type { SocialProfile } from "@/components/CloudProvider";
 
 export type FriendshipRow = {
@@ -13,38 +26,33 @@ export type FriendshipRow = {
 export type PetRow = {
   id: string;
   friendship_id: string;
-  name: string;
   hatched_day: string;
-  died_on: string | null;
+  outfit: Outfit;
 };
 
 export type FriendConnection = {
   friendship: FriendshipRow;
   friend: SocialProfile;
   activePet: PetRow | null;
-  pastPets: PetRow[];
 };
 
-/** Una pandilla compartida con un amigo: sus cuatro criaturas viven dentro de `life.pets`. */
-export type GardenCard = {
+/** La mascota compartida con un amigo, con su vida calculada y las decisiones de la pareja. */
+export type PetCard = {
   pet: PetRow;
   friend: SocialProfile;
-  life: GardenLife;
   currentUserId: string;
+  life: PetLife;
+  identity: Identity | null;
+  choices: ChoiceRow[];
+  owned: CatalogItem[];
+  due: DueChoice[];
 };
-
-/** Una criatura suelta lista para pintar: su estado y, si existe, la pandilla a la que pertenece. */
-export type CreatureEntry = { state: PetState; garden?: GardenCard };
-
-export function creatureEntries(gardens: GardenCard[]): CreatureEntry[] {
-  return gardens.flatMap((garden) => garden.life.pets.map((state) => ({ state, garden })));
-}
 
 export type SocialSnapshot = {
   incoming: FriendConnection[];
   outgoing: FriendConnection[];
   friends: FriendConnection[];
-  pets: GardenCard[];
+  pets: PetCard[];
 };
 
 function friendId(friendship: FriendshipRow, currentUserId: string) {
@@ -77,19 +85,22 @@ export async function loadSocialSnapshot(): Promise<SocialSnapshot> {
   const [profilesResult, petsResult, sessionsResult] = await Promise.all([
     client.from("profiles").select("user_id, handle, display_name").in("user_id", profileIds),
     acceptedIds.length > 0
-      ? client.from("pets").select("id, friendship_id, name, hatched_day, died_on").in("friendship_id", acceptedIds)
+      ? client.from("pets").select("id, friendship_id, hatched_day, outfit").in("friendship_id", acceptedIds).is("died_on", null)
       : Promise.resolve({ data: [], error: null }),
     client.from("meditation_sessions").select("user_id, day, minutes, source").in("user_id", memberIds),
   ]);
-
   if (profilesResult.error) throw profilesResult.error;
   if (petsResult.error) throw petsResult.error;
   if (sessionsResult.error) throw sessionsResult.error;
 
-  const profiles = new Map(
-    ((profilesResult.data ?? []) as SocialProfile[]).map((profile) => [profile.user_id, profile]),
-  );
   const pets = (petsResult.data ?? []) as PetRow[];
+  const { data: choiceData, error: choiceError } = pets.length > 0
+    ? await client.from("pet_choices").select("*").in("pet_id", pets.map((pet) => pet.id)).order("proposed_at", { ascending: true })
+    : { data: [], error: null };
+  if (choiceError) throw choiceError;
+  const choices = (choiceData ?? []) as ChoiceRow[];
+
+  const profiles = new Map(((profilesResult.data ?? []) as SocialProfile[]).map((profile) => [profile.user_id, profile]));
   const sessions = (sessionsResult.data ?? []).map((row) => ({
     userId: row.user_id as string,
     day: row.day as string,
@@ -101,40 +112,90 @@ export async function loadSocialSnapshot(): Promise<SocialSnapshot> {
   const connections = friendships.flatMap<FriendConnection>((friendship) => {
     const friend = profiles.get(friendId(friendship, userId));
     if (!friend) return [];
-    const friendshipPets = pets
-      .filter((pet) => pet.friendship_id === friendship.id)
-      .sort((left, right) => right.hatched_day.localeCompare(left.hatched_day));
-    return [{
-      friendship,
-      friend,
-      activePet: friendshipPets.find((pet) => pet.died_on === null) ?? null,
-      pastPets: friendshipPets.filter((pet) => pet.died_on !== null),
-    }];
+    return [{ friendship, friend, activePet: pets.find((pet) => pet.friendship_id === friendship.id) ?? null }];
   });
 
-  const petCards: GardenCard[] = [];
-  for (const connection of connections.filter((item) => item.friendship.status === "accepted" && item.activePet)) {
-    const pet = connection.activePet!;
-    const life = computeGardenLife({
+  const cards: PetCard[] = [];
+  for (const connection of connections) {
+    const pet = connection.activePet;
+    if (!pet) continue;
+    const petChoices = choices.filter((choice) => choice.pet_id === pet.id);
+    const identity = identityOf(petChoices);
+    const life = computePetLife({
       sessions,
       ownerIds: [userId, connection.friend.user_id],
-      hatchedDay: pet.hatched_day,
+      startDay: pet.hatched_day,
+      identityDay: identity ? toDayString(new Date(identity.confirmedAt)) : null,
       todayDay,
-      seed: pet.id,
     });
-    petCards.push({ pet, friend: connection.friend, life, currentUserId: userId });
+    cards.push({
+      pet,
+      friend: connection.friend,
+      currentUserId: userId,
+      life,
+      identity: identity?.identity ?? null,
+      choices: petChoices,
+      owned: ownedItems(petChoices),
+      due: dueChoices(life, petChoices),
+    });
   }
 
   return {
-    incoming: connections.filter(
-      (item) => item.friendship.status === "pending" && item.friendship.addressee_id === userId,
-    ),
-    outgoing: connections.filter(
-      (item) => item.friendship.status === "pending" && item.friendship.requester_id === userId,
-    ),
+    incoming: connections.filter((item) => item.friendship.status === "pending" && item.friendship.addressee_id === userId),
+    outgoing: connections.filter((item) => item.friendship.status === "pending" && item.friendship.requester_id === userId),
     friends: connections.filter((item) => item.friendship.status === "accepted"),
-    pets: petCards,
+    pets: cards,
   };
+}
+
+/**
+ * Propone (o contrapropone) la decisión de un hito: una fila por mascota, vida e hito.
+ * Una decisión ya confirmada no se puede pisar: la propuesta solo sustituye a otra abierta.
+ */
+export async function proposeChoice(petId: string, life: number, milestoneDay: number, payload: ChoicePayload, current: ChoiceRow | null) {
+  const { client, userId } = await requireClient();
+  const proposal = { payload, proposed_by: userId, proposed_at: new Date().toISOString(), confirmed_by: null, confirmed_at: null };
+  if (current) {
+    const { data, error } = await client.from("pet_choices").update(proposal).eq("id", current.id).is("confirmed_at", null).select("id");
+    if (error) throw error;
+    if (!data || data.length === 0) throw new Error("Esa decisión ya se cerró. Vuelve a mirarla.");
+    return;
+  }
+  const { error } = await client.from("pet_choices").insert({ pet_id: petId, life, milestone_day: milestoneDay, ...proposal });
+  if (error) throw error.code === "23505" ? new Error("Ya hay una propuesta para este hito. Vuelve a mirarla.") : error;
+}
+
+/**
+ * Confirma la propuesta del otro tal y como la vio (misma proposed_at) y, si es una pieza,
+ * la deja puesta en su hueco a partir de lo que la base devuelve, no de la fila en pantalla.
+ */
+export async function confirmChoice(card: PetCard, row: ChoiceRow) {
+  const { client, userId } = await requireClient();
+  const { data, error } = await client
+    .from("pet_choices")
+    .update({ confirmed_by: userId, confirmed_at: new Date().toISOString() })
+    .eq("id", row.id)
+    .eq("proposed_at", row.proposed_at)
+    .is("confirmed_at", null)
+    .select("payload");
+  if (error) throw error;
+  const payload = data?.[0]?.payload as ChoicePayload | undefined;
+  if (!payload) throw new Error("Esa propuesta ya cambió. Vuelve a mirarla.");
+
+  const item = "item" in payload && payload.item ? catalogItem(payload.item) : null;
+  if (item) await wearItem(card.pet.id, item.slot, item.id);
+}
+
+/** Pone una pieza en su hueco (null lo vacía) sobre el atuendo actual de la base, no sobre el que vio la pantalla. */
+export async function wearItem(petId: string, slot: Slot, itemId: string | null) {
+  const { client } = await requireClient();
+  const { data, error } = await client.from("pets").select("outfit").eq("id", petId).single();
+  if (error) throw error;
+  const outfit: Outfit = { ...(data.outfit as Outfit) };
+  if (itemId === null) delete outfit[slot];
+  else outfit[slot] = itemId;
+  const { error: writeError } = await client.from("pets").update({ outfit }).eq("id", petId);
+  if (writeError) throw writeError;
 }
 
 export async function requestFriend(handle: string) {
@@ -158,28 +219,14 @@ export async function removeFriendship(friendshipId: string) {
   if (error) throw error;
 }
 
-export async function createSharedPet(friendshipId: string, name: string) {
-  const { client } = await requireClient();
-  const { error } = await client.rpc("create_shared_pet", {
-    target_friendship_id: friendshipId,
-    target_pet_name: name.trim(),
-  });
-  if (error) throw error;
-}
-
 /**
- * Despierta la pandilla de una amistad si todavía no existe. Los dos amigos pueden
- * llamarla a la vez: el índice único deja viva una sola, y la carrera perdida se ignora.
+ * Pone el huevo de una amistad si todavía no existe. Los dos amigos pueden llamarla a la
+ * vez: el índice único deja vivo uno solo, y la carrera perdida se ignora.
  */
 export async function ensureSharedPet(friendshipId: string) {
-  try {
-    await createSharedPet(friendshipId, "Jardín compartido");
-    return true;
-  } catch (cause) {
-    const message = cause instanceof Error ? cause.message : String(cause);
-    if (message.includes("mascota viva")) return false;
-    throw cause;
-  }
+  const { client } = await requireClient();
+  const { error } = await client.rpc("create_shared_pet", { target_friendship_id: friendshipId, target_pet_name: "Huevo" });
+  if (error && !error.message.includes("mascota viva")) throw error;
 }
 
 export async function updateMyProfile(handle: string, displayName: string) {

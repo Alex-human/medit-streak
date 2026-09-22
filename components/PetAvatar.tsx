@@ -1,5 +1,7 @@
 import { useId, type ReactNode } from "react";
-import { PET_DETAILS, PET_STAGES, type EggPhase, type PetKind, type PetMood, type PetStage } from "@/lib/social/domain";
+import { PET_STAGES, type EggPhase, type PetKind, type PetMood, type PetStage } from "@/lib/social/domain";
+import type { CatalogItem, Slot } from "@/lib/social/catalog";
+import { AncestralAura, ITEM_DRAWINGS, ITEM_GRADIENTS, ItemDefs, Spark as Sparkle, type ItemIds } from "./PetItems";
 
 /** Ojos grandes y brillantes: la cara sigue siendo mona en todas las evoluciones. */
 function Face({ mood, y = 92, x = 80 }: { mood: PetMood; y?: number; x?: number }) {
@@ -50,16 +52,6 @@ function Face({ mood, y = 92, x = 80 }: { mood: PetMood; y?: number; x?: number 
       ) : null}
       {mood === "peligro" ? <path d={`M${x + 31} ${y - 21}c0 9.5-10.5 9.5-10.5 0 0-5 5.25-11.5 5.25-11.5s5.25 6.5 5.25 11.5`} fill="rgba(113,205,255,.9)" /> : null}
     </g>
-  );
-}
-
-function Sparkle({ x, y, r = 5, fill = "#fff6bd", opacity = 1 }: { x: number; y: number; r?: number; fill?: string; opacity?: number }) {
-  return (
-    <path
-      d={`M${x} ${y - r}q${r * 0.22} ${r * 0.78} ${r} ${r}q-${r * 0.78} ${r * 0.22} -${r} ${r}q-${r * 0.22} -${r * 0.78} -${r} -${r}q${r * 0.78} -${r * 0.22} ${r} -${r}Z`}
-      fill={fill}
-      opacity={opacity}
-    />
   );
 }
 
@@ -149,14 +141,11 @@ function HatchShells({ ids }: { ids: EggIds }) {
 type PetDrawingProps = {
   stageIndex: number;
   mood: PetMood;
-  ids: { body: string; soft: string; accent: string };
+  fills: { body: string; soft: string; accent: string };
 };
 
 /* Chispa: brasa -> cria con patas -> dragoncillo -> fenix -> sol guardian */
-function FirePet({ stageIndex, mood, ids }: PetDrawingProps) {
-  const body = `url(#${ids.body})`;
-  const soft = `url(#${ids.soft})`;
-  const accent = `url(#${ids.accent})`;
+function FirePet({ stageIndex, mood, fills: { body, soft, accent } }: PetDrawingProps) {
   const outline = "rgba(255,255,255,.78)";
 
   if (stageIndex === 0) {
@@ -296,10 +285,7 @@ function FirePet({ stageIndex, mood, ids }: PetDrawingProps) {
 }
 
 /* Glu: gota -> cria con aletas -> cristal -> golem -> monarca de hielo */
-function WaterPet({ stageIndex, mood, ids }: PetDrawingProps) {
-  const body = `url(#${ids.body})`;
-  const soft = `url(#${ids.soft})`;
-  const accent = `url(#${ids.accent})`;
+function WaterPet({ stageIndex, mood, fills: { body, soft, accent } }: PetDrawingProps) {
   const outline = "rgba(255,255,255,.85)";
 
   if (stageIndex === 0) {
@@ -432,10 +418,7 @@ function WaterPet({ stageIndex, mood, ids }: PetDrawingProps) {
 }
 
 /* Tilo: semilla -> brote con patas -> arbolito -> arbol -> guardian ancestral */
-function ForestPet({ stageIndex, mood, ids }: PetDrawingProps) {
-  const body = `url(#${ids.body})`;
-  const soft = `url(#${ids.soft})`;
-  const accent = `url(#${ids.accent})`;
+function ForestPet({ stageIndex, mood, fills: { body, soft, accent } }: PetDrawingProps) {
   const outline = "rgba(255,255,255,.66)";
   const bark = "#8a5c38";
 
@@ -574,8 +557,7 @@ function ForestPet({ stageIndex, mood, ids }: PetDrawingProps) {
 }
 
 /* Nimbo: nubecita -> nube con patas -> nube gris con rayo -> tormenta -> coloso */
-function CloudPet({ stageIndex, mood, ids }: PetDrawingProps) {
-  const body = `url(#${ids.body})`;
+function CloudPet({ stageIndex, mood, fills: { body } }: PetDrawingProps) {
   const outline = "rgba(255,255,255,.84)";
   const bolt = "#ffe14f";
   const boltEdge = "#fff6c2";
@@ -714,7 +696,7 @@ const DRAWINGS: Record<PetKind, (props: PetDrawingProps) => ReactNode> = {
   nube: CloudPet,
 };
 
-const COLORS: Record<PetKind, { body: [string, string, string]; soft: [string, string]; accent: [string, string]; egg: [string, string, string] }> = {
+const COLORS: Record<PetKind, { body: string[]; soft: string[]; accent: string[]; egg: string[] }> = {
   fuego: { body: ["#ffe486", "#ff9450", "#ef426f"], soft: ["#fff7c4", "#ffb648"], accent: ["#ff6f63", "#ffd15c"], egg: ["#fff6d6", "#ffd08a", "#ff9a72"] },
   agua: { body: ["#eafdff", "#8ce2fb", "#5f93ef"], soft: ["#ffffff", "#bdeeff"], accent: ["#8ce9ff", "#8c9cff"], egg: ["#ffffff", "#d2f3ff", "#93c6f6"] },
   bosque: { body: ["#d7ab72", "#a56d43", "#6c4630"], soft: ["#c2f39b", "#5fb96d"], accent: ["#e3fba8", "#63c478"], egg: ["#f7fbe0", "#d3ea9f", "#8fbd6c"] },
@@ -722,7 +704,7 @@ const COLORS: Record<PetKind, { body: [string, string, string]; soft: [string, s
 };
 
 /** La nube se va cargando de tormenta: cada etapa oscurece su cuerpo. */
-const CLOUD_BODY_BY_STAGE: [string, string, string][] = [
+const CLOUD_BODY_BY_STAGE: string[][] = [
   ["#ffffff", "#eef6ff", "#cbd9f2"],
   ["#ffffff", "#e6f0ff", "#b6c7e8"],
   ["#f6fafe", "#d0ddf3", "#94a6ca"],
@@ -731,10 +713,68 @@ const CLOUD_BODY_BY_STAGE: [string, string, string][] = [
   ["#b9c7e4", "#6174a0", "#2f3c60"],
 ];
 
-function colorsFor(kind: PetKind, stageIndex: number) {
+/** Sin elemento todavía, el huevo es neutro: crema con motas suaves. */
+function colorsFor(kind: PetKind | null, stageIndex: number) {
+  if (kind === null) return { ...COLORS.nube, egg: ["#fffdf5", "#ffe9c4", "#f3cfa6"], accent: ["#ffd6e8", "#c8d8ff"] };
   const base = COLORS[kind];
   if (kind !== "nube") return base;
-  return { ...base, body: CLOUD_BODY_BY_STAGE[stageIndex] ?? base.body };
+  return { ...base, body: CLOUD_BODY_BY_STAGE[stageIndex] };
+}
+
+type Anchor = [x: number, y: number, scale: number];
+type Anchors = Record<Slot, Anchor>;
+
+/** Dónde se apoya cada pieza en cada cuerpo: coronilla, cuello, centro de la espalda, base de la cola, mano y suelo. */
+const ANCHORS: Record<PetKind, Anchors[]> = {
+  fuego: [
+    { cabeza: [80, 40, 0.8], cuello: [80, 122, 0.85], espalda: [80, 94, 0.9], cola: [110, 118, 0.8], mano: [110, 112, 0.7], suelo: [80, 138, 0.9] },
+    { cabeza: [80, 30, 0.85], cuello: [80, 116, 0.9], espalda: [80, 90, 1], cola: [112, 118, 0.9], mano: [126, 112, 0.8], suelo: [80, 140, 1] },
+    { cabeza: [80, 18, 0.9], cuello: [80, 114, 0.95], espalda: [80, 86, 1.1], cola: [118, 116, 0.95], mano: [130, 110, 0.85], suelo: [80, 142, 1.05] },
+    { cabeza: [80, 12, 0.95], cuello: [80, 112, 1], espalda: [80, 84, 1.2], cola: [120, 116, 1], mano: [134, 110, 0.9], suelo: [80, 144, 1.1] },
+    { cabeza: [80, 6, 1], cuello: [80, 116, 1.05], espalda: [80, 84, 1.3], cola: [116, 122, 1.05], mano: [132, 112, 0.95], suelo: [80, 152, 1.15] },
+    { cabeza: [80, 0, 1.05], cuello: [80, 118, 1.1], espalda: [80, 84, 1.4], cola: [118, 124, 1.1], mano: [136, 114, 1], suelo: [80, 158, 1.2] },
+  ],
+  agua: [
+    { cabeza: [80, 40, 0.8], cuello: [80, 120, 0.85], espalda: [80, 94, 0.9], cola: [106, 116, 0.8], mano: [106, 112, 0.7], suelo: [80, 132, 0.9] },
+    { cabeza: [80, 26, 0.85], cuello: [80, 118, 0.9], espalda: [80, 92, 1], cola: [112, 120, 0.9], mano: [128, 114, 0.8], suelo: [80, 138, 1] },
+    { cabeza: [80, 18, 0.9], cuello: [80, 118, 0.95], espalda: [80, 90, 1.1], cola: [116, 118, 0.95], mano: [130, 112, 0.85], suelo: [80, 142, 1.05] },
+    { cabeza: [80, 26, 0.95], cuello: [80, 116, 1], espalda: [80, 86, 1.2], cola: [120, 118, 1], mano: [136, 112, 0.9], suelo: [80, 148, 1.1] },
+    { cabeza: [80, 14, 1], cuello: [80, 116, 1.05], espalda: [80, 86, 1.3], cola: [124, 120, 1.05], mano: [140, 112, 0.95], suelo: [80, 150, 1.15] },
+    { cabeza: [80, 6, 1.05], cuello: [80, 118, 1.1], espalda: [80, 84, 1.4], cola: [128, 122, 1.1], mano: [144, 114, 1], suelo: [80, 152, 1.2] },
+  ],
+  bosque: [
+    { cabeza: [80, 44, 0.8], cuello: [80, 124, 0.85], espalda: [80, 98, 0.9], cola: [108, 120, 0.8], mano: [108, 116, 0.7], suelo: [80, 138, 0.9] },
+    { cabeza: [80, 52, 0.85], cuello: [80, 118, 0.9], espalda: [80, 94, 1], cola: [104, 120, 0.9], mano: [118, 114, 0.8], suelo: [80, 144, 1] },
+    { cabeza: [80, 14, 0.9], cuello: [80, 120, 0.95], espalda: [80, 92, 1.1], cola: [110, 124, 0.95], mano: [128, 116, 0.85], suelo: [80, 146, 1.05] },
+    { cabeza: [80, 4, 0.95], cuello: [80, 122, 1], espalda: [80, 92, 1.2], cola: [114, 126, 1], mano: [138, 116, 0.9], suelo: [80, 148, 1.1] },
+    { cabeza: [80, 2, 1], cuello: [80, 122, 1.05], espalda: [80, 90, 1.3], cola: [118, 128, 1.05], mano: [140, 116, 0.95], suelo: [80, 150, 1.15] },
+    { cabeza: [80, -2, 1.05], cuello: [80, 124, 1.1], espalda: [80, 90, 1.4], cola: [122, 130, 1.1], mano: [146, 118, 1], suelo: [80, 152, 1.2] },
+  ],
+  nube: [
+    { cabeza: [80, 48, 0.8], cuello: [80, 108, 0.85], espalda: [80, 84, 1.1], cola: [118, 100, 0.8], mano: [118, 100, 0.7], suelo: [80, 128, 0.9] },
+    { cabeza: [80, 34, 0.85], cuello: [80, 104, 0.9], espalda: [80, 80, 1.3], cola: [128, 104, 0.9], mano: [138, 96, 0.8], suelo: [80, 140, 1] },
+    { cabeza: [80, 30, 0.9], cuello: [80, 104, 0.95], espalda: [80, 78, 1.45], cola: [136, 104, 0.95], mano: [144, 94, 0.85], suelo: [80, 142, 1.05] },
+    { cabeza: [80, 28, 0.95], cuello: [80, 102, 1], espalda: [80, 76, 1.6], cola: [142, 100, 1], mano: [150, 90, 0.9], suelo: [80, 144, 1.1] },
+    { cabeza: [80, 16, 1], cuello: [80, 100, 1.05], espalda: [80, 72, 1.7], cola: [140, 106, 1.05], mano: [150, 92, 0.95], suelo: [80, 148, 1.15] },
+    { cabeza: [80, 12, 1.05], cuello: [80, 102, 1.1], espalda: [80, 70, 1.8], cola: [146, 110, 1.1], mano: [154, 92, 1], suelo: [80, 154, 1.2] },
+  ],
+};
+
+const BACK_SLOTS: Slot[] = ["suelo", "espalda", "cola"];
+const FRONT_SLOTS: Slot[] = ["cuello", "cabeza", "mano"];
+
+function ItemLayer({ items, slots, anchors, ids }: { items: CatalogItem[]; slots: Slot[]; anchors: Anchors; ids: ItemIds }) {
+  return slots.map((slot) => {
+    const item = items.find((candidate) => candidate.slot === slot);
+    const draw = item ? ITEM_DRAWINGS[item.id] : null;
+    if (!item || !draw) return null;
+    const [x, y, scale] = anchors[slot];
+    return (
+      <g key={slot} transform={`translate(${x} ${y}) scale(${scale})`}>
+        {draw(ids)}
+      </g>
+    );
+  });
 }
 
 /** La escala remata el salto: de cría diminuta a criatura desarrollada. */
@@ -747,35 +787,47 @@ export default function PetAvatar({
   stage,
   mood,
   eggPhase = null,
+  items = [],
+  ancestral = false,
+  name,
   size = "normal",
 }: {
-  kind: PetKind;
+  /** Sin elemento acordado (null) solo puede pintarse el huevo neutro. */
+  kind: PetKind | null;
   stage: PetStage;
   mood: PetMood;
   /** Fase del huevo mientras nace; una criatura caída se pinta siempre como criatura. */
   eggPhase?: EggPhase | null;
-  size?: "tiny" | "small" | "normal" | "large";
+  /** Piezas puestas, una por hueco; el huevo no lleva nada. */
+  items?: CatalogItem[];
+  ancestral?: boolean;
+  name: string;
+  size?: "small" | "normal" | "large";
 }) {
   const rawId = useId().replaceAll(":", "");
   const ids = { body: `pet-body-${rawId}`, soft: `pet-soft-${rawId}`, accent: `pet-accent-${rawId}`, egg: `pet-egg-${rawId}` };
-  const stageIndex = Math.max(0, PET_STAGES.findIndex((item) => item.id === stage));
+  const fills = { body: `url(#${ids.body})`, soft: `url(#${ids.soft})`, accent: `url(#${ids.accent})` };
+  const itemIds = Object.fromEntries(ITEM_GRADIENTS.map((key) => [key, `pet-${key}-${rawId}`])) as ItemIds;
+  const stageIndex = PET_STAGES.findIndex((item) => item.id === stage);
+  const bodyKind = kind ?? "nube";
   const colors = colorsFor(kind, stageIndex);
-  const hatching = mood === "fallecida" ? null : eggPhase;
-  const inEgg = hatching !== null && hatching < 4 ? (hatching as 0 | 1 | 2 | 3) : null;
-  const scale = inEgg !== null ? EGG_SCALE : STAGE_SCALE[stageIndex] ?? 1;
-  const Drawing = DRAWINGS[kind];
-  const name = PET_DETAILS[kind].name;
+  const inEgg = eggPhase !== null && eggPhase < 4 ? (eggPhase as 0 | 1 | 2 | 3) : null;
+  const scale = inEgg !== null ? EGG_SCALE : STAGE_SCALE[stageIndex];
+  const Drawing = DRAWINGS[bodyKind];
+  const anchors = ANCHORS[bodyKind][stageIndex];
+  const worn = inEgg !== null ? [] : items;
   const label = inEgg !== null
     ? `${name}, huevo, día ${inEgg + 1}`
-    : hatching === 4
+    : eggPhase === 4
       ? `${name}, recién nacida, ${mood}`
-      : `${name}, ${PET_STAGES[stageIndex]?.label ?? stage}, ${mood}`;
+      : `${name}, ${PET_STAGES[stageIndex].label}, ${mood}`;
 
   return (
-    <div className={`pet-avatar pet-avatar-${size} pet-avatar-${kind} pet-avatar-${mood}${inEgg !== null ? " pet-avatar-egg" : ""}`} role="img" aria-label={label}>
+    <div className={`pet-avatar pet-avatar-${size} pet-avatar-${kind ?? "huevo"} pet-avatar-${mood}${inEgg !== null ? " pet-avatar-egg" : ""}`} role="img" aria-label={label}>
       <span className="pet-avatar-aura" aria-hidden="true" />
       <svg viewBox="0 0 160 160" aria-hidden="true">
         <defs>
+          {worn.length > 0 || ancestral ? <ItemDefs ids={itemIds} /> : null}
           <radialGradient id={ids.body} cx="35%" cy="25%" r="82%">
             <stop offset="0%" stopColor={colors.body[0]} />
             <stop offset="58%" stopColor={colors.body[1]} />
@@ -795,14 +847,17 @@ export default function PetAvatar({
             <stop offset="100%" stopColor={colors.accent[1]} />
           </linearGradient>
         </defs>
+        {ancestral ? <AncestralAura ids={itemIds} /> : null}
         <ellipse cx="80" cy={142 - (1 - scale) * 6} rx={16 + 28 * scale} ry={4 + 4.5 * scale} fill="rgba(15,44,68,.12)" />
         <g style={{ transform: `translate(80px, 84px) scale(${scale}) translate(-80px, -84px)` }}>
           {inEgg !== null ? (
             <Egg phase={inEgg} ids={ids} />
           ) : (
             <>
-              {hatching === 4 ? <HatchShells ids={ids} /> : null}
-              <Drawing stageIndex={stageIndex} mood={mood} ids={ids} />
+              <ItemLayer items={worn} slots={BACK_SLOTS} anchors={anchors} ids={itemIds} />
+              {eggPhase === 4 ? <HatchShells ids={ids} /> : null}
+              <Drawing stageIndex={stageIndex} mood={mood} fills={fills} />
+              <ItemLayer items={worn} slots={FRONT_SLOTS} anchors={anchors} ids={itemIds} />
             </>
           )}
         </g>

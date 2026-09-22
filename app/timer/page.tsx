@@ -32,9 +32,9 @@ export default function TimerPage() {
           const snapshot = await loadSocialSnapshot();
           if (active) {
             setPetCareMode(
-              snapshot.pets.some((card) => card.life.mood === "peligro")
+              snapshot.pets.some((card) => card.life.mood === "peligro" && card.life.endangeredUserId === cloud.user?.id)
                 ? "rescue"
-                : snapshot.pets.some((card) => card.life.fallenCount > 0)
+                : snapshot.pets.some((card) => card.life.phase === "fallen")
                   ? "revive"
                   : null,
             );
@@ -116,9 +116,9 @@ export default function TimerPage() {
 
           {petCareMode ? (
             <div className="danger-panel p-4">
-              <div className="text-xs muted">{petCareMode === "revive" ? "Una criatura espera volver" : "La pandilla está en peligro"}</div>
+              <div className="text-xs muted">{petCareMode === "revive" ? "Vuestra mascota espera volver" : "Vuestra mascota está en peligro"}</div>
               <div className="glass-title text-lg font-semibold mt-1">
-                {petCareMode === "revive" ? "Completa 60 min para revivir una mascota." : "Completa 60 min para proteger la pandilla."}
+                {petCareMode === "revive" ? "Completa 60 min para revivir a vuestra mascota." : "Completa 60 min para proteger a vuestra mascota."}
               </div>
             </div>
           ) : null}
@@ -132,8 +132,8 @@ export default function TimerPage() {
           <div className="glass-panel p-4 text-sm muted">
             {petCareMode
               ? petCareMode === "revive"
-                ? "Una hora completada devuelve a la última criatura que cayó."
-                : "Una hora completada hoy evita que una criatura caiga."
+                ? "Una hora completada devuelve a la mascota caída."
+                : "Una hora completada hoy evita que vuestra mascota caiga."
               : recoveryAvailable
                 ? "Al terminar 30 min, se marcarán hoy y ayer."
               : "Al terminar, se marcará “hoy” como meditado y volverás al inicio."}

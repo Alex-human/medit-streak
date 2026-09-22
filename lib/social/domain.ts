@@ -2,30 +2,59 @@ import { addDays } from "../dates";
 
 export const STREAK_RESCUE_MINUTES = 30;
 export const PET_RESCUE_MINUTES = 60;
+/** Días de peligro tras un día fallado antes de que la criatura caiga. */
 export const PET_RESCUE_DAYS = 5;
 /** Días que una criatura caída espera a que la revivan antes de volver como huevo. */
 export const PET_REVIVE_DAYS = 4;
-/** Días de vínculo que la criatura pasa naciendo del huevo. */
+/** Días de vínculo que la criatura pasa dentro del huevo. */
 export const EGG_DAYS = 5;
+/** Vínculo que enciende el aura ancestral, que ya no se apaga ni al renacer. */
+export const ANCESTRAL_DAY = 365;
 
 export const PET_KINDS = ["fuego", "agua", "bosque", "nube"] as const;
 export type PetKind = (typeof PET_KINDS)[number];
 
-export const PET_DETAILS: Record<PetKind, { name: string; title: string; description: string }> = {
-  fuego: { name: "Chispa", title: "Espíritu de fuego", description: "Crece de una brasa tímida a un pequeño sol guardián." },
-  agua: { name: "Glú", title: "Gota de hielo", description: "Cada etapa la vuelve más cristalina, hasta dominar el hielo." },
-  bosque: { name: "Tilo", title: "Guardián del bosque", description: "Una bellota que echa raíces, ramas y una gran copa." },
-  nube: { name: "Nimbo", title: "Nube de los sueños", description: "Aprende a llover, hacer arcoíris y guardar pequeñas estrellas." },
+export const PET_DETAILS: Record<PetKind, { name: string; title: string }> = {
+  fuego: { name: "Chispa", title: "Espíritu de fuego" },
+  agua: { name: "Glú", title: "Gota de hielo" },
+  bosque: { name: "Tilo", title: "Guardián del bosque" },
+  nube: { name: "Nimbo", title: "Nube de los sueños" },
 };
 
 export const PET_STAGES = [
-  { id: "origen", label: "Origen", minBondDays: 0 },
-  { id: "cría", label: "Cría", minBondDays: 10 },
-  { id: "curiosa", label: "Curiosa", minBondDays: 50 },
-  { id: "radiante", label: "Radiante", minBondDays: 70 },
-  { id: "mítica", label: "Mítica", minBondDays: 100 },
-  { id: "guardiana", label: "Guardiana", minBondDays: 200 },
+  { id: "bebe", label: "Bebé", minBondDays: 0 },
+  { id: "cria", label: "Cría", minBondDays: 12 },
+  { id: "joven", label: "Joven", minBondDays: 25 },
+  { id: "adulta", label: "Adulta", minBondDays: 45 },
+  { id: "radiante", label: "Radiante", minBondDays: 90 },
+  { id: "guardiana", label: "Guardiana", minBondDays: 180 },
 ] as const;
+
+export type PetStage = (typeof PET_STAGES)[number]["id"];
+export type PetMood = "dormida" | "esperando" | "feliz" | "recuperable" | "peligro" | "fallecida";
+export type PetPhase = "egg" | "alive" | "fallen";
+/** 0 intacto, 1 rajita, 2 grietas, 3 casi roto, 4 recién nacida entre las cáscaras. */
+export type EggPhase = 0 | 1 | 2 | 3 | 4;
+
+export type ChoicePick = "objeto" | "rasgo" | "libre";
+export type ChoiceMilestone = { day: number; pick: ChoicePick };
+
+/** Hitos de elección por días de vínculo; después del año, uno cada 60 días. */
+export const CHOICE_MILESTONES: ChoiceMilestone[] = [
+  { day: 8, pick: "objeto" },
+  { day: 16, pick: "objeto" },
+  { day: 20, pick: "rasgo" },
+  { day: 30, pick: "libre" },
+  { day: 38, pick: "rasgo" },
+  { day: 55, pick: "libre" },
+  { day: 70, pick: "rasgo" },
+  { day: 110, pick: "libre" },
+  { day: 140, pick: "libre" },
+  { day: 220, pick: "libre" },
+  { day: 270, pick: "libre" },
+  { day: 365, pick: "libre" },
+];
+const LATE_CHOICE_EVERY = 60;
 
 export type SocialSession = {
   userId: string;
@@ -34,55 +63,35 @@ export type SocialSession = {
   source: "timer" | "manual" | "import";
 };
 
-export type PetStage = (typeof PET_STAGES)[number]["id"];
-export type PetMood = "dormida" | "esperando" | "feliz" | "recuperable" | "peligro" | "fallecida";
-/** 0 intacto, 1 rajita, 2 grietas, 3 casi roto, 4 recién nacida entre las cáscaras. */
-export type EggPhase = 0 | 1 | 2 | 3 | 4;
-
-/** Estado individual de una criatura: cada una vive, muere y evoluciona por su cuenta. */
-export type PetState = {
-  kind: PetKind;
-  alive: boolean;
-  /** Día en el que nació o volvió como huevo: el vínculo se cuenta desde aquí. */
+export type PetLife = {
+  phase: PetPhase;
+  /** Vida actual: cada renacer suma una. */
+  life: number;
+  /** Día en que empezó el huevo de esta vida: el vínculo se cuenta desde aquí. */
   bornDay: string;
+  hatchDay: string | null;
   diedDay: string | null;
-  /** Día en que una criatura caída vuelve como huevo si nadie la revive antes. */
-  rebirthDay: string | null;
-  /** Días que faltan para ese huevo contados desde hoy; 1 significa mañana. */
+  /** Días que faltan para que la criatura caída vuelva como huevo; 1 significa mañana. */
   rebirthInDays: number | null;
   bondDays: number;
   stage: PetStage;
-  mood: PetMood;
-  /** Fase del huevo durante los primeros días de vínculo; null cuando ya es criatura. */
   eggPhase: EggPhase | null;
-};
-
-export type GardenLife = {
-  pets: PetState[];
-  /** Ánimo compartido por las criaturas vivas. */
   mood: PetMood;
-  /** Vínculo de la criatura viva más veterana. */
-  bondDays: number;
+  /** El huevo ya pide nombre y elemento. */
+  identityDue: boolean;
+  /** Hitos de elección alcanzados en esta vida. */
+  milestones: ChoiceMilestone[];
+  ancestral: boolean;
   ownersDoneToday: string[];
   endangeredUserId: string | null;
-  rescueDeadline: string | null;
   rescueDaysLeft: number | null;
-  fallenCount: number;
+  /** Álbum: día en que la criatura alcanzó cada etapa, vida a vida. */
+  history: { life: number; stage: PetStage; day: string }[];
 };
-
-type MissedDay = {
-  day: string;
-  rescuedBy: "streak" | "pet" | null;
-  rescueDeadline: string;
-};
-
-type LifeEvent = { day: string; type: "death" | "revival" };
 
 function dayRange(start: string, end: string) {
   const days: string[] = [];
-  for (let day = start; day <= end; day = addDays(day, 1)) {
-    days.push(day);
-  }
+  for (let day = start; day <= end; day = addDays(day, 1)) days.push(day);
   return days;
 }
 
@@ -94,231 +103,166 @@ function totalsByDay(sessions: SocialSession[], userId: string, source?: SocialS
   }, {});
 }
 
-function rescueForMissedDay(day: string, timerTotals: Record<string, number>): MissedDay {
-  const nextDay = addDays(day, 1);
-  if ((timerTotals[nextDay] ?? 0) >= STREAK_RESCUE_MINUTES) {
-    return { day, rescuedBy: "streak", rescueDeadline: nextDay };
-  }
-
-  return { day, rescuedBy: null, rescueDeadline: addDays(day, PET_RESCUE_DAYS + 1) };
-}
-
-function incidentsForUser(
-  sessions: SocialSession[],
-  userId: string,
-  startDay: string,
-  todayDay: string,
-) {
-  const allTotals = totalsByDay(sessions, userId);
-  const timerTotals = totalsByDay(sessions, userId, "timer");
-  const yesterday = addDays(todayDay, -1);
-
-  const missed = dayRange(startDay, yesterday)
-    .filter((day) => (allTotals[day] ?? 0) === 0)
-    .map((day) => rescueForMissedDay(day, timerTotals));
-
-  return { allTotals, missed };
+function daysBetween(from: string, to: string) {
+  return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000);
 }
 
 export function petStageForBond(bondDays: number): PetStage {
-  return [...PET_STAGES]
-    .reverse()
-    .find((stage) => bondDays >= stage.minBondDays)?.id ?? "origen";
+  return [...PET_STAGES].reverse().find((stage) => bondDays >= stage.minBondDays)?.id ?? "bebe";
 }
 
-/** Los primeros EGG_DAYS días de vínculo la criatura nace: día 1 huevo intacto, día 5 recién salida. */
-export function eggPhaseForBond(bondDays: number): EggPhase | null {
-  if (bondDays > EGG_DAYS) return null;
-  return Math.max(0, Math.min(EGG_DAYS - 1, bondDays - 1)) as EggPhase;
+export function choiceMilestones(bondDays: number): ChoiceMilestone[] {
+  const reached = CHOICE_MILESTONES.filter((milestone) => milestone.day <= bondDays);
+  for (let day = ANCESTRAL_DAY + LATE_CHOICE_EVERY; day <= bondDays; day += LATE_CHOICE_EVERY) {
+    reached.push({ day, pick: "libre" });
+  }
+  return reached;
 }
 
-/** Orden estable en el que caen las criaturas de un jardín concreto. */
-export function petKindOrder(seed: string) {
-  let hash = 0;
-  for (const char of seed) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
-  const offset = hash % PET_KINDS.length;
-  return [...PET_KINDS.slice(offset), ...PET_KINDS.slice(0, offset)];
-}
+type Incident = { owner: number; day: string; deadline: string; rescued: boolean };
+type Chapter = { life: number; bornDay: string; hatchDay: string | null; endDay: string };
 
-export function computeGardenLife({
+/**
+ * Recorre día a día la vida de la mascota compartida. Un día fallado queda a salvo con
+ * 30 min de cronómetro al día siguiente; si no, abre PET_RESCUE_DAYS días de peligro que
+ * cierran 60 min de cronómetro de quien falló. Sin rescate la criatura cae, y tiene
+ * PET_REVIVE_DAYS días para que 60 min de cualquiera la devuelvan con su vínculo intacto;
+ * pasado el plazo vuelve como huevo con la misma identidad. El huevo y la criatura caída
+ * no acumulan peligro: sus días fallados solo dejan de sumar vínculo.
+ */
+export function computePetLife({
   sessions,
   ownerIds,
-  hatchedDay,
+  startDay,
+  identityDay,
   todayDay,
-  seed = hatchedDay,
 }: {
   sessions: SocialSession[];
   ownerIds: [string, string];
-  hatchedDay: string;
+  startDay: string;
+  /** Día en que los dos acordaron nombre y elemento; sin él el huevo no rompe. */
+  identityDay: string | null;
   todayDay: string;
-  seed?: string;
-}): GardenLife {
-  const perOwner = ownerIds.map((ownerId) => ({
-    ownerId,
-    ...incidentsForUser(sessions, ownerId, hatchedDay, todayDay),
-  }));
+}): PetLife {
+  const totals = ownerIds.map((id) => totalsByDay(sessions, id));
+  const timer = ownerIds.map((id) => totalsByDay(sessions, id, "timer"));
+  const safe = (owner: number, day: string) =>
+    (totals[owner][day] ?? 0) > 0 || (timer[owner][addDays(day, 1)] ?? 0) >= STREAK_RESCUE_MINUTES;
+  const rescuedDays = ownerIds.map(() => new Set<string>());
+  const bonded = (day: string) => ownerIds.every((_, owner) => safe(owner, day) || rescuedDays[owner].has(day));
 
-  const candidates = perOwner
-    .flatMap(({ ownerId, missed }) => missed.map((incident) => ({ ownerId, ...incident })))
-    .filter((incident) => incident.rescuedBy === null)
-    .sort((left, right) => left.day.localeCompare(right.day));
-  const revivedIncidents = new Set<(typeof candidates)[number]>();
-  const revivalDays: string[] = [];
-  const rescueSessions = sessions
-    .map((session, index) => ({ session, index }))
-    .filter(({ session }) => ownerIds.includes(session.userId) && session.source === "timer" && session.minutes >= PET_RESCUE_MINUTES)
-    .sort((left, right) => left.session.day.localeCompare(right.session.day) || left.index - right.index);
+  let phase: PetPhase = "egg";
+  let life = 1;
+  let bornDay = startDay;
+  let hatchDay: string | null = null;
+  let diedDay: string | null = null;
+  let incidents: Incident[] = [];
+  let aliveYesterday = false;
+  const chapters: Chapter[] = [];
 
-  for (const { session } of rescueSessions) {
-    // La criatura cae el día siguiente al plazo y espera PET_REVIVE_DAYS días a los 60 min.
-    const fallen = candidates.find(
-      (incident) =>
-        incident.rescuedBy === null
-        && !revivedIncidents.has(incident)
-        && incident.rescueDeadline < session.day
-        && session.day <= addDays(incident.rescueDeadline, PET_REVIVE_DAYS),
-    );
-    if (fallen) {
-      revivedIncidents.add(fallen);
-      revivalDays.push(session.day);
-      continue;
+  for (const day of dayRange(startDay, todayDay)) {
+    const yesterday = addDays(day, -1);
+    const rescuers = ownerIds.flatMap((_, owner) => ((timer[owner][day] ?? 0) >= PET_RESCUE_MINUTES ? [owner] : []));
+
+    if (phase === "fallen" && diedDay !== null && day >= addDays(diedDay, PET_REVIVE_DAYS)) {
+      chapters.push({ life, bornDay, hatchDay, endDay: diedDay });
+      phase = "egg";
+      life += 1;
+      bornDay = day;
+      hatchDay = null;
+      diedDay = null;
     }
+    if (phase === "egg" && identityDay !== null && identityDay <= day && dayRange(bornDay, day).filter(bonded).length >= EGG_DAYS) {
+      phase = "alive";
+      hatchDay = day;
+    }
+    if (phase === "alive" && incidents.some((incident) => !incident.rescued && incident.deadline < day)) {
+      phase = "fallen";
+      diedDay = day;
+      incidents = [];
+    }
+    if (phase === "fallen" && diedDay !== null && rescuers.length > 0 && day < addDays(diedDay, PET_REVIVE_DAYS)) {
+      phase = "alive";
+      diedDay = null;
+    }
+    if (phase === "alive") {
+      if (aliveYesterday) {
+        ownerIds.forEach((_, owner) => {
+          if (!safe(owner, yesterday)) {
+            incidents.push({ owner, day: yesterday, deadline: addDays(yesterday, PET_RESCUE_DAYS + 1), rescued: false });
+          }
+        });
+      }
+      for (const owner of rescuers) {
+        const target = incidents.find(
+          (incident) => incident.owner === owner && !incident.rescued && day >= addDays(incident.day, 2) && day <= incident.deadline,
+        );
+        if (target) {
+          target.rescued = true;
+          rescuedDays[owner].add(target.day);
+        }
+      }
+    }
+    aliveYesterday = phase === "alive";
+  }
+  chapters.push({ life, bornDay, hatchDay, endDay: todayDay });
 
-    const endangered = candidates.find(
-      (incident) =>
-        incident.rescuedBy === null
-        && incident.ownerId === session.userId
-        && session.day >= addDays(incident.day, 2)
-        && session.day <= incident.rescueDeadline,
-    );
-    if (endangered) endangered.rescuedBy = "pet";
+  const bondDays = dayRange(bornDay, todayDay).filter(bonded).length;
+  const history: PetLife["history"] = [];
+  let ancestral = false;
+  for (const chapter of chapters) {
+    let bond = 0;
+    for (const day of dayRange(chapter.bornDay, chapter.endDay)) {
+      if (bonded(day)) bond += 1;
+      if (chapter.hatchDay === null || day < chapter.hatchDay) continue;
+      for (const stage of PET_STAGES) {
+        if (bond >= stage.minBondDays && !history.some((entry) => entry.life === chapter.life && entry.stage === stage.id)) {
+          history.push({ life: chapter.life, stage: stage.id, day });
+        }
+      }
+    }
+    if (bond >= ANCESTRAL_DAY) ancestral = true;
   }
 
-  const unresolved = candidates.filter(
-    (incident) => incident.rescuedBy === null && !revivedIncidents.has(incident),
-  );
-  const fatalIncidents = candidates.filter(
-    (incident) => incident.rescuedBy === null && incident.rescueDeadline < todayDay,
-  );
-  const danger = unresolved.find(
-    (incident) => todayDay >= addDays(incident.day, 2) && todayDay <= incident.rescueDeadline,
-  );
-  const grace = unresolved.find((incident) => todayDay === addDays(incident.day, 1));
-
-  const ownersDoneToday = perOwner
-    .filter(({ allTotals }) => (allTotals[todayDay] ?? 0) > 0)
-    .map(({ ownerId }) => ownerId);
-
-  const protectedByOwner = perOwner.map(({ ownerId, allTotals, missed }) => {
-    const rescued = new Set([
-      ...missed.filter((incident) => incident.rescuedBy !== null).map((incident) => incident.day),
-      ...candidates.filter((incident) => incident.ownerId === ownerId && incident.rescuedBy === "pet").map((incident) => incident.day),
-    ]);
-    return {
-      ownerId,
-      protectedDays: new Set(
-        dayRange(hatchedDay, todayDay).filter((day) => (allTotals[day] ?? 0) > 0 || rescued.has(day)),
-      ),
-    };
-  });
-
-  const bondedDays = dayRange(hatchedDay, todayDay).filter((day) =>
-    protectedByOwner.every(({ protectedDays }) => protectedDays.has(day)),
-  );
-
-  // Cada muerte se lleva a la primera criatura viva del orden. Un rescate de 60 min
-  // dentro de los PET_REVIVE_DAYS siguientes devuelve a la última que cayó con su
-  // vínculo intacto; si nadie la revive, vuelve sola como huevo y empieza de cero.
-  const events: LifeEvent[] = [
-    ...fatalIncidents.map((incident) => ({ day: addDays(incident.rescueDeadline, 1), type: "death" as const })),
-    ...revivalDays.map((day) => ({ day, type: "revival" as const })),
-  ].sort((left, right) => left.day.localeCompare(right.day) || (left.type === "death" ? -1 : 1));
-
-  const timeline = petKindOrder(seed).map((kind) => ({
-    kind,
-    alive: true,
-    bornDay: hatchedDay,
-    diedDay: null as string | null,
-  }));
-  const rebirthDayOf = (diedDay: string) => addDays(diedDay, PET_REVIVE_DAYS);
-  const hatchFallenBefore = (day: string) => {
-    for (const pet of timeline) {
-      if (pet.alive || pet.diedDay === null) continue;
-      const rebirthDay = rebirthDayOf(pet.diedDay);
-      if (rebirthDay >= day) continue;
-      pet.alive = true;
-      pet.bornDay = rebirthDay;
-      pet.diedDay = null;
-    }
-  };
-
-  for (const event of events) {
-    hatchFallenBefore(event.day);
-    if (event.type === "death") {
-      const victim = timeline.find((pet) => pet.alive);
-      if (!victim) continue;
-      victim.alive = false;
-      victim.diedDay = event.day;
-      continue;
-    }
-    const revived = timeline
-      .filter((pet) => !pet.alive && pet.diedDay !== null && event.day < rebirthDayOf(pet.diedDay))
-      .sort((left, right) => (right.diedDay ?? "").localeCompare(left.diedDay ?? ""))[0];
-    if (!revived) continue;
-    revived.alive = true;
-    revived.diedDay = null;
-  }
-  hatchFallenBefore(addDays(todayDay, 1));
-  const fallenCount = timeline.filter((pet) => !pet.alive).length;
-
-  const mood: PetMood = danger
-    ? "peligro"
-    : grace
-      ? "recuperable"
-      : ownersDoneToday.length === 2
-        ? "feliz"
-        : ownersDoneToday.length === 1
-          ? "esperando"
-          : "dormida";
-
-  const daysUntil = (day: string) =>
-    Math.round((Date.parse(`${day}T00:00:00Z`) - Date.parse(`${todayDay}T00:00:00Z`)) / 86_400_000);
-
-  const pets: PetState[] = timeline.map((pet) => {
-    if (!pet.alive) {
-      const rebirthDay = rebirthDayOf(pet.diedDay ?? todayDay);
-      return {
-        ...pet,
-        rebirthDay,
-        rebirthInDays: Math.max(1, daysUntil(rebirthDay)),
-        bondDays: 0,
-        stage: "origen" as PetStage,
-        mood: "fallecida" as PetMood,
-        eggPhase: null,
-      };
-    }
-    const bondDays = bondedDays.filter((day) => day >= pet.bornDay).length;
-    return {
-      ...pet,
-      rebirthDay: null,
-      rebirthInDays: null,
-      bondDays,
-      stage: petStageForBond(bondDays),
-      mood,
-      eggPhase: eggPhaseForBond(bondDays),
-    };
-  });
-
-  const rescueDaysLeft = danger ? Math.max(0, daysUntil(danger.rescueDeadline)) : grace ? PET_RESCUE_DAYS : null;
+  const open = incidents.filter((incident) => !incident.rescued);
+  const danger = open.find((incident) => todayDay >= addDays(incident.day, 2) && todayDay <= incident.deadline);
+  const grace = open.find((incident) => todayDay === addDays(incident.day, 1));
+  const ownersDoneToday = ownerIds.filter((_, owner) => (totals[owner][todayDay] ?? 0) > 0);
+  const mood: PetMood = phase === "fallen"
+    ? "fallecida"
+    : danger
+      ? "peligro"
+      : grace
+        ? "recuperable"
+        : ownersDoneToday.length === 2
+          ? "feliz"
+          : ownersDoneToday.length === 1
+            ? "esperando"
+            : "dormida";
+  const eggPhase: EggPhase | null = phase === "egg"
+    ? (Math.min(3, Math.max(0, bondDays - 1)) as EggPhase)
+    : phase === "alive" && hatchDay === todayDay
+      ? 4
+      : null;
+  const endangered = danger ?? grace;
 
   return {
-    pets,
+    phase,
+    life,
+    bornDay,
+    hatchDay,
+    diedDay,
+    rebirthInDays: diedDay !== null ? Math.max(1, daysBetween(todayDay, addDays(diedDay, PET_REVIVE_DAYS))) : null,
+    bondDays,
+    stage: phase === "egg" ? "bebe" : petStageForBond(bondDays),
+    eggPhase,
     mood,
-    bondDays: pets.reduce((best, pet) => (pet.alive ? Math.max(best, pet.bondDays) : best), 0),
+    identityDue: phase === "egg" && identityDay === null && bondDays >= EGG_DAYS - 1,
+    milestones: phase === "alive" ? choiceMilestones(bondDays) : [],
+    ancestral,
     ownersDoneToday,
-    endangeredUserId: danger?.ownerId ?? grace?.ownerId ?? null,
-    rescueDeadline: danger?.rescueDeadline ?? grace?.rescueDeadline ?? null,
-    rescueDaysLeft,
-    fallenCount,
+    endangeredUserId: endangered ? ownerIds[endangered.owner] : null,
+    rescueDaysLeft: danger ? Math.max(0, daysBetween(todayDay, danger.deadline)) : grace ? PET_RESCUE_DAYS : null,
+    history,
   };
 }

@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from "react"
 import AuthScreen from "@/components/AuthScreen";
 import { useCloud } from "@/components/CloudProvider";
 import PetAvatar from "@/components/PetAvatar";
+import { splitReveal } from "@/lib/social/reveal";
 import TimeBackground from "@/components/TimeBackground";
 import {
   ensureSharedPet,
@@ -14,10 +15,9 @@ import {
   respondToFriendship,
   updateMyProfile,
   type FriendConnection,
-  type GardenCard,
+  type PetCard,
   type SocialSnapshot,
 } from "@/lib/cloud/social";
-import { PET_KINDS, type PetState } from "@/lib/social/domain";
 
 const EMPTY: SocialSnapshot = { incoming: [], outgoing: [], friends: [], pets: [] };
 
@@ -140,9 +140,9 @@ export default function FriendsPage() {
                 <FriendCard
                   key={connection.friendship.id}
                   connection={connection}
-                  garden={snapshot.pets.find((card) => card.pet.id === connection.activePet?.id)}
+                  card={snapshot.pets.find((card) => card.pet.id === connection.activePet?.id)}
                   onRemove={() => {
-                    if (!window.confirm(`¿Eliminar tu amistad con ${connection.friend.display_name}? También se eliminará vuestra mascota compartida.`)) return;
+                    if (!window.confirm(`¿Eliminar tu amistad con ${connection.friend.display_name}? También se eliminará vuestra mascota.`)) return;
                     void run(connection.friendship.id, () => removeFriendship(connection.friendship.id), "Amistad eliminada.");
                   }}
                 />
@@ -209,10 +209,7 @@ export default function FriendsPage() {
   );
 }
 
-function FriendCard({ connection, garden, onRemove }: { connection: FriendConnection; garden?: GardenCard; onRemove: () => void }) {
-  const states: Pick<PetState, "kind" | "stage" | "mood" | "eggPhase">[] =
-    garden?.life.pets ?? PET_KINDS.map((kind) => ({ kind, stage: "origen" as const, mood: "dormida" as const, eggPhase: 0 as const }));
-
+function FriendCard({ connection, card, onRemove }: { connection: FriendConnection; card?: PetCard; onRemove: () => void }) {
   return (
     <article className="friend-card">
       <div className="flex items-center gap-3">
@@ -221,18 +218,23 @@ function FriendCard({ connection, garden, onRemove }: { connection: FriendConnec
         <button type="button" onClick={onRemove} className="text-[11px] muted underline underline-offset-4">Eliminar</button>
       </div>
 
-      <div className="friend-pet mt-3">
-        <p className="text-xs muted">Tus mascotas con {connection.friend.display_name}</p>
-        <div className="friend-pet-miniatures mt-2">
-          {states.map((state) => (
-            <PetAvatar key={state.kind} kind={state.kind} stage={state.stage} mood={state.mood} eggPhase={state.eggPhase} size="tiny" />
-          ))}
+      <div className="friend-pet mt-3 flex items-center gap-3">
+        <PetAvatar
+          kind={card?.identity?.element ?? null}
+          stage={card?.life.stage ?? "bebe"}
+          mood={card?.life.mood ?? "dormida"}
+          eggPhase={card ? card.life.eggPhase : 0}
+          items={card ? splitReveal(card).shown : []}
+          ancestral={card?.life.ancestral}
+          name={card?.identity?.name ?? "Huevo"}
+          size="small"
+        />
+        <div className="min-w-0 flex-1">
+          <p className="text-xs muted">Vuestra mascota</p>
+          <p className="font-semibold truncate">{card?.identity?.name ?? "Huevo"}</p>
         </div>
-        <Link
-          href={`/pets?con=${connection.friendship.id}`}
-          className="glass-button glass-button-primary block w-full text-center py-2 text-xs mt-3"
-        >
-          Mascotas
+        <Link href={`/pets?con=${connection.friendship.id}`} className="glass-button glass-button-primary px-3 py-2 text-xs">
+          Ver
         </Link>
       </div>
     </article>

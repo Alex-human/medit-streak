@@ -267,6 +267,8 @@ export default function HomePage() {
       const next = await getAllDays();
       setRecords(next);
       closeManualDay(true);
+      // Apuntar la meditación de hoy también es meditar: la mascota lo celebra igual.
+      if (day === todayDay) setCelebratePets(true);
       setManualMinutes(String(minutes));
       setManualConfirmed(false);
     } catch {

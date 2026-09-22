@@ -1,232 +1,207 @@
 import { describe, expect, it } from "vitest";
-import { computeGardenLife, eggPhaseForBond, petStageForBond, type SocialSession } from "./domain";
+import { addDays } from "../dates";
+import { choiceMilestones, computePetLife, petStageForBond, type SocialSession } from "./domain";
+import { dueChoices, equippedItems, identityOf, ownedItems, pendingOrders, wornOn, type ChoiceRow } from "./catalog";
 
 const owners: [string, string] = ["alex", "amiga"];
+/** Día n del calendario de pruebas: D(1) = 2026-01-01. */
+const D = (n: number) => addDays("2026-01-01", n - 1);
 
 function session(userId: string, day: string, minutes = 10, source: SocialSession["source"] = "timer"): SocialSession {
   return { userId, day, minutes, source };
 }
 
-function livingCount(pets: { alive: boolean }[]) {
-  return pets.filter((pet) => pet.alive).length;
+/** Los dos meditan 10 min cada día de 1 a `days`, salvo los días que cada uno falla. */
+function daily(days: number, skip: { alex?: number[]; amiga?: number[] } = {}) {
+  const sessions: SocialSession[] = [];
+  for (let n = 1; n <= days; n += 1) {
+    if (!skip.alex?.includes(n)) sessions.push(session("alex", D(n)));
+    if (!skip.amiga?.includes(n)) sessions.push(session("amiga", D(n)));
+  }
+  return sessions;
 }
 
-describe("shared pet life", () => {
-  it("wakes for one owner and becomes happy when both meditate", () => {
-    const waiting = computeGardenLife({
-      sessions: [session("alex", "2026-09-16")],
-      ownerIds: owners,
-      hatchedDay: "2026-09-16",
-      todayDay: "2026-09-16",
-    });
-    const happy = computeGardenLife({
-      sessions: [session("alex", "2026-09-16"), session("amiga", "2026-09-16")],
-      ownerIds: owners,
-      hatchedDay: "2026-09-16",
-      todayDay: "2026-09-16",
-    });
+function life(sessions: SocialSession[], today: number, identityDay: number | null = 4) {
+  return computePetLife({ sessions, ownerIds: owners, startDay: D(1), identityDay: identityDay === null ? null : D(identityDay), todayDay: D(today) });
+}
 
-    expect(waiting.mood).toBe("esperando");
-    expect(happy.mood).toBe("feliz");
-    expect(happy.bondDays).toBe(1);
-    expect(happy.pets).toHaveLength(4);
-    expect(happy.pets.every((pet) => pet.alive && pet.bondDays === 1 && pet.eggPhase === 0)).toBe(true);
+describe("egg", () => {
+  it("cracks a little more each bond day and asks for the identity on day four", () => {
+    const sessions = daily(10);
+    expect(life(sessions, 1, null)).toMatchObject({ phase: "egg", bondDays: 1, eggPhase: 0, identityDue: false });
+    expect(life(sessions, 2, null).eggPhase).toBe(1);
+    expect(life(sessions, 3, null).eggPhase).toBe(2);
+    expect(life(sessions, 4, null)).toMatchObject({ eggPhase: 3, identityDue: true });
+    expect(life(sessions, 5, null)).toMatchObject({ phase: "egg", eggPhase: 3, identityDue: true, milestones: [] });
+    expect(life(sessions, 4)).toMatchObject({ eggPhase: 3, identityDue: false });
   });
 
-  it("offers the existing 30 minute recovery on the next day", () => {
-    const life = computeGardenLife({
-      sessions: [
-        session("alex", "2026-09-14"),
-        session("amiga", "2026-09-14"),
-        session("amiga", "2026-09-15"),
-      ],
-      ownerIds: owners,
-      hatchedDay: "2026-09-14",
-      todayDay: "2026-09-16",
-    });
-
-    expect(life.mood).toBe("recuperable");
-    expect(life.endangeredUserId).toBe("alex");
+  it("hatches on the fifth bond day once the identity is agreed", () => {
+    const sessions = daily(12);
+    expect(life(sessions, 5)).toMatchObject({ phase: "alive", hatchDay: D(5), eggPhase: 4, stage: "bebe", bondDays: 5, mood: "feliz" });
+    expect(life(sessions, 6).eggPhase).toBeNull();
+    expect(life(sessions, 7, 7)).toMatchObject({ phase: "alive", hatchDay: D(7), eggPhase: 4, bondDays: 7 });
+    expect(life(sessions, 12)).toMatchObject({ stage: "cria", milestones: [{ day: 8, pick: "objeto" }] });
+    expect(life(sessions, 12).history).toEqual([
+      { life: 1, stage: "bebe", day: D(5) },
+      { life: 1, stage: "cria", day: D(12) },
+    ]);
   });
 
-  it("a 30 minute timer session protects the missed day", () => {
-    const life = computeGardenLife({
-      sessions: [
-        session("alex", "2026-09-14"),
-        session("amiga", "2026-09-14"),
-        session("amiga", "2026-09-15"),
-        session("alex", "2026-09-16", 30),
-        session("amiga", "2026-09-16"),
-      ],
-      ownerIds: owners,
-      hatchedDay: "2026-09-14",
-      todayDay: "2026-09-16",
-    });
+  it("cannot die: missed days only delay the hatching", () => {
+    const sessions = daily(20, { alex: [2, 3] });
+    expect(life(sessions, 6)).toMatchObject({ phase: "egg", bondDays: 4 });
+    expect(life(sessions, 7)).toMatchObject({ phase: "alive", hatchDay: D(7), bondDays: 5 });
+    expect(life(sessions, 15)).toMatchObject({ phase: "alive", mood: "feliz", bondDays: 13, rescueDaysLeft: null });
+  });
+});
 
-    expect(life.mood).toBe("feliz");
-    expect(life.bondDays).toBe(3);
+describe("danger", () => {
+  it("offers the 30 minute streak recovery the next day", () => {
+    const missed = life(daily(20, { alex: [8] }), 9);
+    expect(missed).toMatchObject({ mood: "recuperable", endangeredUserId: "alex", rescueDaysLeft: 5 });
+
+    const saved = life([...daily(20, { alex: [8, 9] }), session("alex", D(9), 30)], 9);
+    expect(saved).toMatchObject({ mood: "feliz", bondDays: 9, rescueDaysLeft: null });
   });
 
-  it("enters danger and one 60 minute session rescues the pet", () => {
-    const base = [
-      session("alex", "2026-09-14"),
-      session("amiga", "2026-09-14"),
-      session("amiga", "2026-09-15"),
-      session("amiga", "2026-09-16"),
+  it("enters danger for five days and one 60 minute session of the owner rescues the pet", () => {
+    const danger = life(daily(20, { alex: [8] }), 10);
+    expect(danger).toMatchObject({ mood: "peligro", rescueDaysLeft: 4 });
+    expect(life(daily(20, { alex: [8] }), 14).rescueDaysLeft).toBe(0);
+
+    const rescued = life([...daily(20, { alex: [8, 10] }), session("alex", D(10), 60)], 10);
+    expect(rescued).toMatchObject({ mood: "feliz", bondDays: 10, rescueDaysLeft: null });
+
+    const friendCannot = life([...daily(20, { alex: [8], amiga: [10] }), session("amiga", D(10), 60)], 10);
+    expect(friendCannot.mood).toBe("peligro");
+  });
+
+  it("rescues one incident per 60 minute day, so two missed days keep the pet in danger", () => {
+    const sessions = [...daily(20, { alex: [8, 9] }), session("alex", D(11), 60)];
+    expect(life(sessions, 11)).toMatchObject({ mood: "peligro", endangeredUserId: "alex", rescueDaysLeft: 4, bondDays: 10 });
+    expect(life(sessions, 16).phase).toBe("fallen");
+  });
+
+  it("opens the danger once when both owners miss the same day, and the pet falls once", () => {
+    const sessions = daily(40, { alex: [8], amiga: [8] });
+    expect(life(sessions, 10).mood).toBe("peligro");
+    expect(life(sessions, 15)).toMatchObject({ phase: "fallen", life: 1, diedDay: D(15) });
+    expect(life(sessions, 19)).toMatchObject({ phase: "egg", life: 2, bornDay: D(19) });
+    expect(life(sessions, 23)).toMatchObject({ phase: "alive", life: 2, hatchDay: D(23) });
+  });
+});
+
+describe("death, revival and rebirth", () => {
+  const sessions = daily(40, { alex: [8] });
+
+  it("falls after the deadline and comes back as an egg four days later with the same identity", () => {
+    expect(life(sessions, 15)).toMatchObject({ phase: "fallen", mood: "fallecida", diedDay: D(15), rebirthInDays: 4, stage: "cria", milestones: [] });
+    expect(life(sessions, 18).rebirthInDays).toBe(1);
+    expect(life(sessions, 19)).toMatchObject({ phase: "egg", life: 2, bornDay: D(19), bondDays: 1, eggPhase: 0, identityDue: false });
+    expect(life(sessions, 23)).toMatchObject({ phase: "alive", life: 2, hatchDay: D(23), eggPhase: 4, bondDays: 5 });
+    expect(life(sessions, 23).history).toEqual([
+      { life: 1, stage: "bebe", day: D(5) },
+      { life: 1, stage: "cria", day: D(13) },
+      { life: 2, stage: "bebe", day: D(23) },
+    ]);
+  });
+
+  it("keeps the bond when 60 minutes of anyone arrive inside the four day window", () => {
+    const revived = life([...sessions, session("amiga", D(17), 60)], 20);
+    expect(revived).toMatchObject({ phase: "alive", life: 1, hatchDay: D(5), bondDays: 19, stage: "cria", mood: "feliz" });
+    expect(life([...sessions, session("alex", D(18), 60)], 18).phase).toBe("alive");
+    expect(life([...sessions, session("alex", D(19), 60)], 19)).toMatchObject({ phase: "egg", life: 2 });
+  });
+
+  it("comes back the same day it falls with 60 minutes of either owner", () => {
+    expect(life([...sessions, session("amiga", D(15), 60)], 15)).toMatchObject({ phase: "alive", life: 1, diedDay: null, mood: "feliz" });
+    expect(life([...sessions, session("alex", D(15), 60)], 15)).toMatchObject({ phase: "alive", life: 1, diedDay: null });
+  });
+
+  it("does not open new dangers for days missed while fallen", () => {
+    const back = [...daily(40, { alex: [8, 16, 17] }), session("alex", D(18), 60)];
+    expect(life(back, 19)).toMatchObject({ phase: "alive", mood: "feliz", rescueDaysLeft: null });
+  });
+
+  it("keeps the ancestral aura through a rebirth", () => {
+    const year = daily(370);
+    expect(life(year, 370)).toMatchObject({ ancestral: true, stage: "guardiana" });
+    expect(life(year, 370).milestones.at(-1)).toEqual({ day: 365, pick: "libre" });
+    expect(life(year, 377).mood).toBe("peligro");
+    expect(life(year, 378).phase).toBe("fallen");
+    expect(life(year, 382)).toMatchObject({ phase: "egg", life: 2, ancestral: true });
+  });
+});
+
+describe("stages and milestones", () => {
+  it("uses the six body thresholds", () => {
+    expect(petStageForBond(0)).toBe("bebe");
+    expect(petStageForBond(11)).toBe("bebe");
+    expect(petStageForBond(12)).toBe("cria");
+    expect(petStageForBond(25)).toBe("joven");
+    expect(petStageForBond(45)).toBe("adulta");
+    expect(petStageForBond(90)).toBe("radiante");
+    expect(petStageForBond(180)).toBe("guardiana");
+  });
+
+  it("is dense in the first month and every 60 days after the first year", () => {
+    expect(choiceMilestones(7)).toEqual([]);
+    expect(choiceMilestones(30).map((milestone) => milestone.day)).toEqual([8, 16, 20, 30]);
+    expect(choiceMilestones(485).map((milestone) => milestone.day).slice(-3)).toEqual([365, 425, 485]);
+  });
+});
+
+describe("shared choices", () => {
+  const row = (overrides: Partial<ChoiceRow>): ChoiceRow => ({
+    id: "row",
+    pet_id: "pet",
+    life: 1,
+    milestone_day: 8,
+    payload: { item: "mala" },
+    proposed_by: "alex",
+    proposed_at: "2026-01-08T10:00:00Z",
+    confirmed_by: "amiga",
+    confirmed_at: "2026-01-08T11:00:00Z",
+    ...overrides,
+  });
+
+  it("reads the agreed identity and the owned items from confirmed rows only", () => {
+    const choices = [
+      row({ milestone_day: 5, payload: { name: "Brasa", element: "fuego" } }),
+      row({ milestone_day: 8 }),
+      row({ milestone_day: 16, payload: { item: "halo" }, confirmed_by: null, confirmed_at: null }),
+      row({ milestone_day: 20, payload: { item: "no-existe" } }),
+      row({ milestone_day: 30, payload: { order: "collar de dragón", item: "cola-llama" } }),
+      row({ milestone_day: 38, payload: { order: "capa de estrellas" } }),
     ];
-    const danger = computeGardenLife({
-      sessions: base,
-      ownerIds: owners,
-      hatchedDay: "2026-09-14",
-      todayDay: "2026-09-17",
-    });
-    const rescued = computeGardenLife({
-      sessions: [...base, session("alex", "2026-09-17", 60)],
-      ownerIds: owners,
-      hatchedDay: "2026-09-14",
-      todayDay: "2026-09-17",
-    });
-
-    expect(danger.mood).toBe("peligro");
-    expect(danger.rescueDeadline).toBe("2026-09-21");
-    expect(danger.pets.every((pet) => pet.alive)).toBe(true);
-    expect(rescued.mood).toBe("esperando");
+    expect(identityOf(choices)?.identity).toEqual({ name: "Brasa", element: "fuego" });
+    expect(ownedItems(choices).map((item) => item.id)).toEqual(["mala", "cola-llama"]);
+    expect(pendingOrders(choices)).toHaveLength(1);
+    expect(equippedItems({ cuello: "mala", cola: "estela-viento" }, ownedItems(choices)).map((item) => item.id)).toEqual(["mala"]);
   });
 
-  it("drops one creature per fatal streak incident and leaves the rest alive", () => {
-    const sessions = [session("alex", "2026-09-14"), session("amiga", "2026-09-14")];
-    const lastChance = computeGardenLife({
-      sessions,
-      ownerIds: owners,
-      hatchedDay: "2026-09-14",
-      todayDay: "2026-09-21",
-    });
-    const dead = computeGardenLife({
-      sessions,
-      ownerIds: owners,
-      hatchedDay: "2026-09-14",
-      todayDay: "2026-09-22",
-    });
-
-    expect(lastChance.mood).toBe("peligro");
-    expect(dead.fallenCount).toBe(2);
-    expect(livingCount(dead.pets)).toBe(2);
-    expect(dead.pets.filter((pet) => !pet.alive).every((pet) => pet.mood === "fallecida")).toBe(true);
-    expect(dead.pets.filter((pet) => pet.alive).every((pet) => pet.mood === "peligro")).toBe(true);
+  it("dresses the album with the last piece confirmed in each slot up to that day", () => {
+    const choices = [
+      row({ id: "halo", milestone_day: 8, payload: { item: "halo" }, proposed_at: "2026-01-08T10:00:00Z", confirmed_at: "2026-01-20T10:00:00Z" }),
+      row({ id: "loto", milestone_day: 16, payload: { item: "loto" }, proposed_at: "2026-01-16T10:00:00Z", confirmed_at: "2026-01-16T11:00:00Z" }),
+      row({ id: "mala", milestone_day: 30, payload: { item: "mala" }, proposed_at: "2026-01-30T10:00:00Z", confirmed_by: null, confirmed_at: null }),
+    ];
+    expect(wornOn(choices, "2026-01-10")).toEqual([]);
+    expect(wornOn(choices, "2026-01-18").map((item) => item.id)).toEqual(["loto"]);
+    expect(wornOn(choices, "2026-01-25").map((item) => item.id)).toEqual(["halo"]);
   });
 
-  it("revives one fallen creature with each later 60 minute timer session", () => {
-    const base = [session("alex", "2026-09-14"), session("amiga", "2026-09-14")];
-    const fallen = computeGardenLife({ sessions: base, ownerIds: owners, hatchedDay: "2026-09-14", todayDay: "2026-09-22" });
-    const revived = computeGardenLife({
-      sessions: [...base, session("alex", "2026-09-22", 60)],
-      ownerIds: owners,
-      hatchedDay: "2026-09-14",
-      todayDay: "2026-09-22",
-    });
+  it("opens the identity, keeps proposals pending and repeats milestones in each life", () => {
+    const egg = life(daily(10), 4, null);
+    expect(dueChoices(egg, [])).toEqual([{ milestone: { day: 5, pick: "identidad" }, row: null }]);
 
-    expect(fallen.fallenCount).toBe(2);
-    expect(revived.fallenCount).toBe(1);
-    expect(livingCount(revived.pets)).toBe(3);
-  });
+    const grown = life(daily(20), 16);
+    const choices = [row({ milestone_day: 8 }), row({ milestone_day: 16, payload: { item: "halo" }, confirmed_by: null, confirmed_at: null })];
+    expect(dueChoices(grown, choices)).toEqual([{ milestone: { day: 16, pick: "objeto" }, row: choices[1] }]);
 
-  it("keeps the bond of a creature revived inside the four day window", () => {
-    // amiga falla el 05: plazo 11, cae el 12 y puede revivir del 12 al 15.
-    const days = Array.from({ length: 20 }, (_, index) => `2026-01-${String(index + 1).padStart(2, "0")}`);
-    const sessions = days.flatMap((day) => [
-      session("alex", day, day === "2026-01-15" ? 60 : 10),
-      ...(day === "2026-01-05" ? [] : [session("amiga", day)]),
-    ]);
-
-    const life = computeGardenLife({
-      sessions,
-      ownerIds: owners,
-      hatchedDay: "2026-01-01",
-      todayDay: "2026-01-20",
-    });
-
-    expect(life.fallenCount).toBe(0);
-    expect(life.pets.every((pet) => pet.bornDay === "2026-01-01" && pet.bondDays === 19 && pet.stage === "cría")).toBe(true);
-  });
-
-  it("gives four days to revive and then brings the creature back as an egg", () => {
-    // alex falla el 05: plazo 11, cae el 12, huevo el 16 si nadie hace 60 min.
-    const days = Array.from({ length: 21 }, (_, index) => `2026-09-${String(index + 1).padStart(2, "0")}`);
-    const sessions = days.flatMap((day) => [
-      ...(day === "2026-09-05" ? [] : [session("alex", day)]),
-      session("amiga", day),
-    ]);
-    const at = (todayDay: string) => computeGardenLife({ sessions, ownerIds: owners, hatchedDay: "2026-09-01", todayDay });
-
-    const fallen = at("2026-09-12");
-    const lastChance = at("2026-09-15");
-    const reborn = at("2026-09-16");
-    const hatching = at("2026-09-20");
-    const hatched = at("2026-09-21");
-
-    expect(fallen.fallenCount).toBe(1);
-    expect(fallen.pets.find((pet) => !pet.alive)).toMatchObject({ diedDay: "2026-09-12", rebirthDay: "2026-09-16", rebirthInDays: 4, eggPhase: null });
-    expect(lastChance.fallenCount).toBe(1);
-    expect(lastChance.pets.find((pet) => !pet.alive)?.rebirthInDays).toBe(1);
-
-    expect(reborn.fallenCount).toBe(0);
-    const egg = reborn.pets.find((pet) => pet.bornDay === "2026-09-16");
-    expect(egg).toMatchObject({ alive: true, bondDays: 1, stage: "origen", eggPhase: 0, rebirthDay: null });
-    expect(reborn.pets.filter((pet) => pet.bornDay === "2026-09-01").every((pet) => pet.bondDays === 15)).toBe(true);
-
-    expect(hatching.pets.find((pet) => pet.bornDay === "2026-09-16")).toMatchObject({ bondDays: 5, eggPhase: 4 });
-    expect(hatched.pets.find((pet) => pet.bornDay === "2026-09-16")).toMatchObject({ bondDays: 6, eggPhase: null });
-  });
-
-  it("ignores a 60 minute session once the egg is already back", () => {
-    const days = Array.from({ length: 21 }, (_, index) => `2026-09-${String(index + 1).padStart(2, "0")}`);
-    const sessions = days.flatMap((day) => [
-      ...(day === "2026-09-05" ? [] : [session("alex", day, day === "2026-09-16" ? 60 : 10)]),
-      session("amiga", day),
-    ]);
-
-    const life = computeGardenLife({ sessions, ownerIds: owners, hatchedDay: "2026-09-01", todayDay: "2026-09-21" });
-
-    expect(life.fallenCount).toBe(0);
-    expect(life.pets.filter((pet) => pet.bornDay === "2026-09-16")).toHaveLength(1);
-    expect(life.pets.filter((pet) => pet.bornDay === "2026-09-01")).toHaveLength(3);
-  });
-
-  it("marks the four creatures as fallen after four fatal incidents", () => {
-    const life = computeGardenLife({
-      sessions: [session("alex", "2026-09-01"), session("amiga", "2026-09-01")],
-      ownerIds: owners,
-      hatchedDay: "2026-09-01",
-      todayDay: "2026-09-11",
-    });
-
-    expect(life.fallenCount).toBe(4);
-    expect(livingCount(life.pets)).toBe(0);
-    expect(life.pets.every((pet) => pet.mood === "fallecida")).toBe(true);
-  });
-});
-
-describe("egg phases", () => {
-  it("hatches over the first five bond days", () => {
-    expect(eggPhaseForBond(0)).toBe(0);
-    expect(eggPhaseForBond(1)).toBe(0);
-    expect(eggPhaseForBond(2)).toBe(1);
-    expect(eggPhaseForBond(3)).toBe(2);
-    expect(eggPhaseForBond(4)).toBe(3);
-    expect(eggPhaseForBond(5)).toBe(4);
-    expect(eggPhaseForBond(6)).toBeNull();
-    expect(eggPhaseForBond(40)).toBeNull();
-  });
-});
-
-describe("pet stages", () => {
-  it("uses all six evolution thresholds", () => {
-    expect(petStageForBond(0)).toBe("origen");
-    expect(petStageForBond(9)).toBe("origen");
-    expect(petStageForBond(10)).toBe("cría");
-    expect(petStageForBond(50)).toBe("curiosa");
-    expect(petStageForBond(70)).toBe("radiante");
-    expect(petStageForBond(100)).toBe("mítica");
-    expect(petStageForBond(200)).toBe("guardiana");
+    const secondLife = life(daily(40, { alex: [8] }), 26);
+    expect(secondLife).toMatchObject({ life: 2, bondDays: 8 });
+    expect(dueChoices(secondLife, choices)).toEqual([{ milestone: { day: 8, pick: "objeto" }, row: null }]);
   });
 });

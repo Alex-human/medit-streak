@@ -33,6 +33,8 @@ export const PET_STAGES = [
 export type PetStage = (typeof PET_STAGES)[number]["id"];
 export type PetMood = "dormida" | "esperando" | "feliz" | "recuperable" | "peligro" | "fallecida";
 export type PetPhase = "egg" | "alive" | "fallen";
+/** Deberes de una persona para salvar a la mascota: 30 min de cronómetro hoy, o 60 min con los días que le quedan. */
+export type PetAlert = { userId: string; minutes: 30 | 60; daysLeft: number };
 /** 0 intacto, 1 rajita, 2 grietas, 3 casi roto, 4 recién nacida entre las cáscaras. */
 export type EggPhase = 0 | 1 | 2 | 3 | 4;
 
@@ -83,8 +85,7 @@ export type PetLife = {
   milestones: ChoiceMilestone[];
   ancestral: boolean;
   ownersDoneToday: string[];
-  endangeredUserId: string | null;
-  rescueDaysLeft: number | null;
+  alerts: PetAlert[];
   /** Álbum: día en que la criatura alcanzó cada etapa, vida a vida. */
   history: { life: number; stage: PetStage; day: string }[];
 };
@@ -224,15 +225,19 @@ export function computePetLife({
     if (bond >= ANCESTRAL_DAY) ancestral = true;
   }
 
+  // Un incidente abierto está en su día de gracia (m+1, 30 min) o en peligro (m+2 a m+6, 60 min).
   const open = incidents.filter((incident) => !incident.rescued);
-  const danger = open.find((incident) => todayDay >= addDays(incident.day, 2) && todayDay <= incident.deadline);
-  const grace = open.find((incident) => todayDay === addDays(incident.day, 1));
+  const alerts = ownerIds.flatMap((userId, owner): PetAlert[] => {
+    const danger = open.filter((incident) => incident.owner === owner && todayDay >= addDays(incident.day, 2));
+    if (danger.length > 0) return [{ userId, minutes: 60, daysLeft: Math.min(...danger.map((incident) => daysBetween(todayDay, incident.deadline))) }];
+    return open.some((incident) => incident.owner === owner) ? [{ userId, minutes: 30, daysLeft: 0 }] : [];
+  });
   const ownersDoneToday = ownerIds.filter((_, owner) => (totals[owner][todayDay] ?? 0) > 0);
   const mood: PetMood = phase === "fallen"
     ? "fallecida"
-    : danger
+    : alerts.some((alert) => alert.minutes === 60)
       ? "peligro"
-      : grace
+      : alerts.length > 0
         ? "recuperable"
         : ownersDoneToday.length === 2
           ? "feliz"
@@ -244,8 +249,6 @@ export function computePetLife({
     : phase === "alive" && hatchDay === todayDay
       ? 4
       : null;
-  const endangered = danger ?? grace;
-
   return {
     phase,
     life,
@@ -261,8 +264,7 @@ export function computePetLife({
     milestones: phase === "alive" ? choiceMilestones(bondDays) : [],
     ancestral,
     ownersDoneToday,
-    endangeredUserId: endangered ? ownerIds[endangered.owner] : null,
-    rescueDaysLeft: danger ? Math.max(0, daysBetween(todayDay, danger.deadline)) : grace ? PET_RESCUE_DAYS : null,
+    alerts,
     history,
   };
 }

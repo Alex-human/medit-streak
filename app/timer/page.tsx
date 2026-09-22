@@ -32,7 +32,7 @@ export default function TimerPage() {
           const snapshot = await loadSocialSnapshot();
           if (active) {
             setPetCareMode(
-              snapshot.pets.some((card) => card.life.mood === "peligro" && card.life.endangeredUserId === cloud.user?.id)
+              snapshot.pets.some((card) => card.life.alerts.some((alert) => alert.userId === cloud.user?.id && alert.minutes === 60))
                 ? "rescue"
                 : snapshot.pets.some((card) => card.life.phase === "fallen")
                   ? "revive"

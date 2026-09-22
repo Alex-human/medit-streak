@@ -52,26 +52,26 @@ describe("egg", () => {
     const sessions = daily(20, { alex: [2, 3] });
     expect(life(sessions, 6)).toMatchObject({ phase: "egg", bondDays: 4 });
     expect(life(sessions, 7)).toMatchObject({ phase: "alive", hatchDay: D(7), bondDays: 5 });
-    expect(life(sessions, 15)).toMatchObject({ phase: "alive", mood: "feliz", bondDays: 13, rescueDaysLeft: null });
+    expect(life(sessions, 15)).toMatchObject({ phase: "alive", mood: "feliz", bondDays: 13, alerts: [] });
   });
 });
 
 describe("danger", () => {
   it("offers the 30 minute streak recovery the next day", () => {
     const missed = life(daily(20, { alex: [8] }), 9);
-    expect(missed).toMatchObject({ mood: "recuperable", endangeredUserId: "alex", rescueDaysLeft: 5 });
+    expect(missed).toMatchObject({ mood: "recuperable", alerts: [{ userId: "alex", minutes: 30, daysLeft: 0 }] });
 
     const saved = life([...daily(20, { alex: [8, 9] }), session("alex", D(9), 30)], 9);
-    expect(saved).toMatchObject({ mood: "feliz", bondDays: 9, rescueDaysLeft: null });
+    expect(saved).toMatchObject({ mood: "feliz", bondDays: 9, alerts: [] });
   });
 
   it("enters danger for five days and one 60 minute session of the owner rescues the pet", () => {
     const danger = life(daily(20, { alex: [8] }), 10);
-    expect(danger).toMatchObject({ mood: "peligro", rescueDaysLeft: 4 });
-    expect(life(daily(20, { alex: [8] }), 14).rescueDaysLeft).toBe(0);
+    expect(danger).toMatchObject({ mood: "peligro", alerts: [{ userId: "alex", minutes: 60, daysLeft: 4 }] });
+    expect(life(daily(20, { alex: [8] }), 14).alerts[0].daysLeft).toBe(0);
 
     const rescued = life([...daily(20, { alex: [8, 10] }), session("alex", D(10), 60)], 10);
-    expect(rescued).toMatchObject({ mood: "feliz", bondDays: 10, rescueDaysLeft: null });
+    expect(rescued).toMatchObject({ mood: "feliz", bondDays: 10, alerts: [] });
 
     const friendCannot = life([...daily(20, { alex: [8], amiga: [10] }), session("amiga", D(10), 60)], 10);
     expect(friendCannot.mood).toBe("peligro");
@@ -79,7 +79,7 @@ describe("danger", () => {
 
   it("rescues one incident per 60 minute day, so two missed days keep the pet in danger", () => {
     const sessions = [...daily(20, { alex: [8, 9] }), session("alex", D(11), 60)];
-    expect(life(sessions, 11)).toMatchObject({ mood: "peligro", endangeredUserId: "alex", rescueDaysLeft: 4, bondDays: 10 });
+    expect(life(sessions, 11)).toMatchObject({ mood: "peligro", alerts: [{ userId: "alex", minutes: 60, daysLeft: 4 }], bondDays: 10 });
     expect(life(sessions, 16).phase).toBe("fallen");
   });
 
@@ -89,6 +89,16 @@ describe("danger", () => {
     expect(life(sessions, 15)).toMatchObject({ phase: "fallen", life: 1, diedDay: D(15) });
     expect(life(sessions, 19)).toMatchObject({ phase: "egg", life: 2, bornDay: D(19) });
     expect(life(sessions, 23)).toMatchObject({ phase: "alive", life: 2, hatchDay: D(23) });
+  });
+});
+
+describe("alerts per person", () => {
+  it("names each owner with their own pending minutes", () => {
+    const both = life(daily(40, { alex: [8], amiga: [8] }), 10);
+    expect(both.alerts).toEqual([{ userId: "alex", minutes: 60, daysLeft: 4 }, { userId: "amiga", minutes: 60, daysLeft: 4 }]);
+
+    const mixed = life(daily(40, { alex: [8], amiga: [9] }), 10);
+    expect(mixed).toMatchObject({ mood: "peligro", alerts: [{ userId: "alex", minutes: 60, daysLeft: 4 }, { userId: "amiga", minutes: 30, daysLeft: 0 }] });
   });
 });
 
@@ -121,7 +131,7 @@ describe("death, revival and rebirth", () => {
 
   it("does not open new dangers for days missed while fallen", () => {
     const back = [...daily(40, { alex: [8, 16, 17] }), session("alex", D(18), 60)];
-    expect(life(back, 19)).toMatchObject({ phase: "alive", mood: "feliz", rescueDaysLeft: null });
+    expect(life(back, 19)).toMatchObject({ phase: "alive", mood: "feliz", alerts: [] });
   });
 
   it("keeps the ancestral aura through a rebirth", () => {

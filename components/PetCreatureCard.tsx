@@ -9,16 +9,26 @@ export function petName(card: PetCard) {
   return card.identity?.name ?? "Huevo";
 }
 
-function statusLine({ life, currentUserId, friend }: PetCard) {
+/** Una línea por persona con deberes hoy (los dos ven quién falta), o el resumen del día si no hay ninguno. */
+function statusLines({ life, currentUserId, friend }: PetCard): string[] {
   if (life.phase === "fallen") {
-    return life.rebirthInDays === 1 ? "Último día: 60 min la reviven" : `Revive con 60 min · huevo en ${life.rebirthInDays} días`;
+    return [life.rebirthInDays === 1 ? "Último día: 60 min de cualquiera la reviven" : `Revive con 60 min de cualquiera · huevo en ${life.rebirthInDays} días`];
   }
-  if (life.identityDue) return life.bondDays >= EGG_DAYS ? "Quiere nacer: falta el nombre" : "Mañana nace: elegid nombre y elemento";
-  if (life.mood === "feliz") return "Hoy la cuidáis los dos";
-  if (life.mood === "esperando") return life.ownersDoneToday.includes(currentUserId) ? `Falta ${friend.display_name}` : "Te toca a ti";
-  if (life.mood === "recuperable") return "30 min hoy salvan la racha";
-  if (life.mood === "peligro") return life.rescueDaysLeft === 0 ? "Último día: 60 min" : `${life.rescueDaysLeft} días · 60 min`;
-  return "Esperando vuestra sesión";
+  if (life.identityDue) return [life.bondDays >= EGG_DAYS ? "Quiere nacer: falta el nombre" : "Mañana nace: elegid nombre y elemento"];
+
+  const name = friend.display_name;
+  const lines = [currentUserId, friend.user_id].flatMap((userId) => {
+    const me = userId === currentUserId;
+    const alert = life.alerts.find((item) => item.userId === userId);
+    if (alert?.minutes === 60) {
+      if (alert.daysLeft === 0) return [me ? "Último día: te tocan 60 min de cronómetro" : `Último día: ${name} necesita 60 min de cronómetro`];
+      return [me ? `Tienes ${alert.daysLeft} días para hacer 60 min de cronómetro` : `${name} tiene ${alert.daysLeft} días para hacer 60 min de cronómetro`];
+    }
+    if (alert) return [me ? "Hoy te tocan 30 min de cronómetro para recuperar la racha" : `Hoy ${name} tiene que hacer 30 min de cronómetro para recuperar la racha`];
+    if (!life.ownersDoneToday.includes(userId)) return [me ? "Hoy te falta meditar a ti" : `Hoy falta ${name} por meditar`];
+    return [];
+  });
+  return lines.length > 0 ? lines : ["Hoy habéis meditado los dos"];
 }
 
 /** La mascota con lo que lleva puesto. `items` son las piezas que esta persona ya ha estrenado. */
@@ -62,10 +72,10 @@ export default function PetCreatureCard({ card, items, hiddenCount = 0, size = "
           ))}
         </div>
 
-        <p className="text-[11px] muted mt-1.5 leading-4">
-          {statusLine(card)}
-          {hiddenCount > 0 ? ` · Estreno en tu próxima meditación` : ""}
-        </p>
+        <div className="text-[11px] muted mt-1.5 leading-4">
+          {statusLines(card).map((line) => <p key={line}>{line}</p>)}
+          {hiddenCount > 0 ? <p>Estreno en tu próxima meditación</p> : null}
+        </div>
       </div>
     </article>
   );

@@ -3,6 +3,10 @@ import { addDays } from "../dates";
 export const STREAK_RESCUE_MINUTES = 30;
 export const PET_RESCUE_MINUTES = 60;
 export const PET_RESCUE_DAYS = 5;
+/** Días que una criatura caída espera a que la revivan antes de volver como huevo. */
+export const PET_REVIVE_DAYS = 4;
+/** Días de vínculo que la criatura pasa naciendo del huevo. */
+export const EGG_DAYS = 5;
 
 export const PET_KINDS = ["fuego", "agua", "bosque", "nube"] as const;
 export type PetKind = (typeof PET_KINDS)[number];
@@ -32,17 +36,25 @@ export type SocialSession = {
 
 export type PetStage = (typeof PET_STAGES)[number]["id"];
 export type PetMood = "dormida" | "esperando" | "feliz" | "recuperable" | "peligro" | "fallecida";
+/** 0 intacto, 1 rajita, 2 grietas, 3 casi roto, 4 recién nacida entre las cáscaras. */
+export type EggPhase = 0 | 1 | 2 | 3 | 4;
 
 /** Estado individual de una criatura: cada una vive, muere y evoluciona por su cuenta. */
 export type PetState = {
   kind: PetKind;
   alive: boolean;
-  /** Día en el que nació o revivió: el vínculo se cuenta desde aquí. */
+  /** Día en el que nació o volvió como huevo: el vínculo se cuenta desde aquí. */
   bornDay: string;
   diedDay: string | null;
+  /** Día en que una criatura caída vuelve como huevo si nadie la revive antes. */
+  rebirthDay: string | null;
+  /** Días que faltan para ese huevo contados desde hoy; 1 significa mañana. */
+  rebirthInDays: number | null;
   bondDays: number;
   stage: PetStage;
   mood: PetMood;
+  /** Fase del huevo durante los primeros días de vínculo; null cuando ya es criatura. */
+  eggPhase: EggPhase | null;
 };
 
 export type GardenLife = {
@@ -114,6 +126,12 @@ export function petStageForBond(bondDays: number): PetStage {
     .find((stage) => bondDays >= stage.minBondDays)?.id ?? "origen";
 }
 
+/** Los primeros EGG_DAYS días de vínculo la criatura nace: día 1 huevo intacto, día 5 recién salida. */
+export function eggPhaseForBond(bondDays: number): EggPhase | null {
+  if (bondDays > EGG_DAYS) return null;
+  return Math.max(0, Math.min(EGG_DAYS - 1, bondDays - 1)) as EggPhase;
+}
+
 /** Orden estable en el que caen las criaturas de un jardín concreto. */
 export function petKindOrder(seed: string) {
   let hash = 0;
@@ -152,8 +170,13 @@ export function computeGardenLife({
     .sort((left, right) => left.session.day.localeCompare(right.session.day) || left.index - right.index);
 
   for (const { session } of rescueSessions) {
+    // La criatura cae el día siguiente al plazo y espera PET_REVIVE_DAYS días a los 60 min.
     const fallen = candidates.find(
-      (incident) => incident.rescuedBy === null && !revivedIncidents.has(incident) && incident.rescueDeadline < session.day,
+      (incident) =>
+        incident.rescuedBy === null
+        && !revivedIncidents.has(incident)
+        && incident.rescueDeadline < session.day
+        && session.day <= addDays(incident.rescueDeadline, PET_REVIVE_DAYS),
     );
     if (fallen) {
       revivedIncidents.add(fallen);
@@ -203,8 +226,9 @@ export function computeGardenLife({
     protectedByOwner.every(({ protectedDays }) => protectedDays.has(day)),
   );
 
-  // Cada muerte se lleva a la siguiente criatura del orden; cada rescate de 60 min
-  // devuelve a la última que cayó, y esa vuelve a empezar desde la primera fase.
+  // Cada muerte se lleva a la primera criatura viva del orden. Un rescate de 60 min
+  // dentro de los PET_REVIVE_DAYS siguientes devuelve a la última que cayó con su
+  // vínculo intacto; si nadie la revive, vuelve sola como huevo y empieza de cero.
   const events: LifeEvent[] = [
     ...fatalIncidents.map((incident) => ({ day: addDays(incident.rescueDeadline, 1), type: "death" as const })),
     ...revivalDays.map((day) => ({ day, type: "revival" as const })),
@@ -216,23 +240,36 @@ export function computeGardenLife({
     bornDay: hatchedDay,
     diedDay: null as string | null,
   }));
-  let fallenCount = 0;
+  const rebirthDayOf = (diedDay: string) => addDays(diedDay, PET_REVIVE_DAYS);
+  const hatchFallenBefore = (day: string) => {
+    for (const pet of timeline) {
+      if (pet.alive || pet.diedDay === null) continue;
+      const rebirthDay = rebirthDayOf(pet.diedDay);
+      if (rebirthDay >= day) continue;
+      pet.alive = true;
+      pet.bornDay = rebirthDay;
+      pet.diedDay = null;
+    }
+  };
+
   for (const event of events) {
+    hatchFallenBefore(event.day);
     if (event.type === "death") {
-      const victim = timeline[fallenCount];
+      const victim = timeline.find((pet) => pet.alive);
       if (!victim) continue;
       victim.alive = false;
       victim.diedDay = event.day;
-      fallenCount += 1;
       continue;
     }
-    const revived = timeline[fallenCount - 1];
+    const revived = timeline
+      .filter((pet) => !pet.alive && pet.diedDay !== null && event.day < rebirthDayOf(pet.diedDay))
+      .sort((left, right) => (right.diedDay ?? "").localeCompare(left.diedDay ?? ""))[0];
     if (!revived) continue;
     revived.alive = true;
     revived.diedDay = null;
-    revived.bornDay = event.day;
-    fallenCount -= 1;
   }
+  hatchFallenBefore(addDays(todayDay, 1));
+  const fallenCount = timeline.filter((pet) => !pet.alive).length;
 
   const mood: PetMood = danger
     ? "peligro"
@@ -244,19 +281,35 @@ export function computeGardenLife({
           ? "esperando"
           : "dormida";
 
+  const daysUntil = (day: string) =>
+    Math.round((Date.parse(`${day}T00:00:00Z`) - Date.parse(`${todayDay}T00:00:00Z`)) / 86_400_000);
+
   const pets: PetState[] = timeline.map((pet) => {
     if (!pet.alive) {
-      return { ...pet, bondDays: 0, stage: "origen" as PetStage, mood: "fallecida" as PetMood };
+      const rebirthDay = rebirthDayOf(pet.diedDay ?? todayDay);
+      return {
+        ...pet,
+        rebirthDay,
+        rebirthInDays: Math.max(1, daysUntil(rebirthDay)),
+        bondDays: 0,
+        stage: "origen" as PetStage,
+        mood: "fallecida" as PetMood,
+        eggPhase: null,
+      };
     }
     const bondDays = bondedDays.filter((day) => day >= pet.bornDay).length;
-    return { ...pet, bondDays, stage: petStageForBond(bondDays), mood };
+    return {
+      ...pet,
+      rebirthDay: null,
+      rebirthInDays: null,
+      bondDays,
+      stage: petStageForBond(bondDays),
+      mood,
+      eggPhase: eggPhaseForBond(bondDays),
+    };
   });
 
-  const rescueDaysLeft = danger
-    ? Math.max(0, Math.round((Date.parse(`${danger.rescueDeadline}T00:00:00Z`) - Date.parse(`${todayDay}T00:00:00Z`)) / 86_400_000))
-    : grace
-      ? PET_RESCUE_DAYS
-      : null;
+  const rescueDaysLeft = danger ? Math.max(0, daysUntil(danger.rescueDeadline)) : grace ? PET_RESCUE_DAYS : null;
 
   return {
     pets,

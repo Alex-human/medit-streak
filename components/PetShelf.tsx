@@ -47,7 +47,7 @@ export default function PetShelf({ celebrate, onCelebrationClose }: { celebrate:
         {!loading && !error && entries.length === 0 ? (
           <div className="pet-empty glass-panel p-3">
             <div className="pet-empty-row">
-              {PET_KINDS.map((kind) => <PetAvatar key={kind} kind={kind} stage="origen" mood="dormida" size="tiny" />)}
+              {PET_KINDS.map((kind) => <PetAvatar key={kind} kind={kind} stage="origen" mood="dormida" eggPhase={0} size="tiny" />)}
             </div>
             <Link href="/friends" className="glass-button glass-button-primary px-4 py-2 text-xs">Añadir amigo</Link>
           </div>

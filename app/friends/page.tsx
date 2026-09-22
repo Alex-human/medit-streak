@@ -210,8 +210,8 @@ export default function FriendsPage() {
 }
 
 function FriendCard({ connection, garden, onRemove }: { connection: FriendConnection; garden?: GardenCard; onRemove: () => void }) {
-  const states: Pick<PetState, "kind" | "stage" | "mood">[] =
-    garden?.life.pets ?? PET_KINDS.map((kind) => ({ kind, stage: "origen" as const, mood: "dormida" as const }));
+  const states: Pick<PetState, "kind" | "stage" | "mood" | "eggPhase">[] =
+    garden?.life.pets ?? PET_KINDS.map((kind) => ({ kind, stage: "origen" as const, mood: "dormida" as const, eggPhase: 0 as const }));
 
   return (
     <article className="friend-card">
@@ -225,7 +225,7 @@ function FriendCard({ connection, garden, onRemove }: { connection: FriendConnec
         <p className="text-xs muted">Tus mascotas con {connection.friend.display_name}</p>
         <div className="friend-pet-miniatures mt-2">
           {states.map((state) => (
-            <PetAvatar key={state.kind} kind={state.kind} stage={state.stage} mood={state.mood} size="tiny" />
+            <PetAvatar key={state.kind} kind={state.kind} stage={state.stage} mood={state.mood} eggPhase={state.eggPhase} size="tiny" />
           ))}
         </div>
         <Link

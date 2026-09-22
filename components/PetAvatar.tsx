@@ -1,5 +1,5 @@
 import { useId, type ReactNode } from "react";
-import { PET_DETAILS, PET_STAGES, type PetKind, type PetMood, type PetStage } from "@/lib/social/domain";
+import { PET_DETAILS, PET_STAGES, type EggPhase, type PetKind, type PetMood, type PetStage } from "@/lib/social/domain";
 
 /** Ojos grandes y brillantes: la cara sigue siendo mona en todas las evoluciones. */
 function Face({ mood, y = 92, x = 80 }: { mood: PetMood; y?: number; x?: number }) {
@@ -60,6 +60,89 @@ function Sparkle({ x, y, r = 5, fill = "#fff6bd", opacity = 1 }: { x: number; y:
       fill={fill}
       opacity={opacity}
     />
+  );
+}
+
+type EggIds = { egg: string; accent: string };
+
+/* Trazados del huevo: entero, mitad inferior, tapa y media cáscara caída en el suelo. */
+const EGG_WHOLE = "M80 28C58 28 42 58 42 88c0 24 17 42 38 42s38-18 38-42c0-30-16-60-38-60Z";
+const EGG_SHELL = "M44 78l8 6 8-8 8 7 8-9 8 8 8-6 8 8 8-7 8 1c2 22-14 52-36 52S42 100 44 78Z";
+const EGG_CAP = "M44 78C43 60 56 28 80 28s37 32 36 50L108 77 100 84 92 76 84 82 76 74 68 83 60 76 52 84Z";
+const HALF_SHELL = "M14 124l6 6 6-7 6 7 6-6 6 6c1 12-6 20-15 20S13 138 14 124Z";
+const EGG_OUTLINE = "rgba(255,255,255,.85)";
+const CRACK = { fill: "none", stroke: "rgba(58,40,66,.78)", strokeWidth: 2.6, strokeLinecap: "round", strokeLinejoin: "round" } as const;
+
+function ShellSpots({ ids }: { ids: EggIds }) {
+  return (
+    <g fill={`url(#${ids.accent})`} opacity=".42">
+      <ellipse cx="62" cy="98" rx="6" ry="4.4" transform="rotate(-18 62 98)" />
+      <ellipse cx="98" cy="104" rx="5" ry="3.6" transform="rotate(22 98 104)" />
+      <circle cx="72" cy="117" r="2.6" />
+    </g>
+  );
+}
+
+function CapShine({ ids }: { ids: EggIds }) {
+  return (
+    <>
+      <ellipse cx="88" cy="60" rx="4.2" ry="3" fill={`url(#${ids.accent})`} opacity=".42" transform="rotate(-30 88 60)" />
+      <ellipse cx="66" cy="58" rx="6" ry="11" fill="rgba(255,255,255,.55)" transform="rotate(22 66 58)" />
+    </>
+  );
+}
+
+/* Huevo: intacto -> rajita -> grietas -> casi roto, con los ojos asomando */
+function Egg({ phase, ids }: { phase: 0 | 1 | 2 | 3; ids: EggIds }) {
+  const egg = `url(#${ids.egg})`;
+
+  if (phase === 3) {
+    return (
+      <g className="pet-egg pet-egg-hatching">
+        <ellipse cx="80" cy="78" rx="32" ry="9" fill="rgba(52,36,64,.62)" />
+        <path d={EGG_SHELL} fill={egg} stroke={EGG_OUTLINE} strokeWidth="3" strokeLinejoin="round" />
+        <ShellSpots ids={ids} />
+        <g fill="#ffffff">
+          <circle cx="72" cy="75" r="3.6" />
+          <circle cx="88" cy="75" r="3.6" />
+        </g>
+        <g fill="rgba(16,38,54,.92)">
+          <circle cx="72.6" cy="75.4" r="2" />
+          <circle cx="88.6" cy="75.4" r="2" />
+        </g>
+        <g transform="translate(2 -6) rotate(-8 44 78)">
+          <path d={EGG_CAP} fill={egg} stroke={EGG_OUTLINE} strokeWidth="3" strokeLinejoin="round" />
+          <CapShine ids={ids} />
+          <path d="M98 42l-5 7 5 5-4 7" {...CRACK} />
+        </g>
+      </g>
+    );
+  }
+
+  return (
+    <g className={phase === 2 ? "pet-egg pet-egg-hatching" : "pet-egg"}>
+      <path d={EGG_WHOLE} fill={egg} stroke={EGG_OUTLINE} strokeWidth="3" strokeLinejoin="round" />
+      <ShellSpots ids={ids} />
+      <CapShine ids={ids} />
+      {phase >= 1 ? <path d="M99 58l-5 7 5 5-4 7" {...CRACK} /> : null}
+      {phase >= 2 ? (
+        <>
+          <path d="M95 77l4 6-6 5 3 7" {...CRACK} />
+          <path d="M55 86l7 4-4 6 6 4-2 6" {...CRACK} />
+          <path d="M66 46l4 5-3 5" {...CRACK} />
+        </>
+      ) : null}
+    </g>
+  );
+}
+
+/** Las dos mitades de la cáscara quedan en el suelo, a los lados de la recién nacida. */
+function HatchShells({ ids }: { ids: EggIds }) {
+  return (
+    <g fill={`url(#${ids.egg})`} stroke={EGG_OUTLINE} strokeWidth="2.6" strokeLinejoin="round">
+      <path d={HALF_SHELL} transform="rotate(-12 30 138)" />
+      <path d={HALF_SHELL} transform="matrix(-1 0 0 1 160 0) rotate(-12 30 138)" />
+    </g>
   );
 }
 
@@ -631,11 +714,11 @@ const DRAWINGS: Record<PetKind, (props: PetDrawingProps) => ReactNode> = {
   nube: CloudPet,
 };
 
-const COLORS: Record<PetKind, { body: [string, string, string]; soft: [string, string]; accent: [string, string] }> = {
-  fuego: { body: ["#ffe486", "#ff9450", "#ef426f"], soft: ["#fff7c4", "#ffb648"], accent: ["#ff6f63", "#ffd15c"] },
-  agua: { body: ["#eafdff", "#8ce2fb", "#5f93ef"], soft: ["#ffffff", "#bdeeff"], accent: ["#8ce9ff", "#8c9cff"] },
-  bosque: { body: ["#d7ab72", "#a56d43", "#6c4630"], soft: ["#c2f39b", "#5fb96d"], accent: ["#e3fba8", "#63c478"] },
-  nube: { body: ["#ffffff", "#e6f2ff", "#bfd2f4"], soft: ["#ffffff", "#ddf7ff"], accent: ["#f6b8ff", "#93dfff"] },
+const COLORS: Record<PetKind, { body: [string, string, string]; soft: [string, string]; accent: [string, string]; egg: [string, string, string] }> = {
+  fuego: { body: ["#ffe486", "#ff9450", "#ef426f"], soft: ["#fff7c4", "#ffb648"], accent: ["#ff6f63", "#ffd15c"], egg: ["#fff6d6", "#ffd08a", "#ff9a72"] },
+  agua: { body: ["#eafdff", "#8ce2fb", "#5f93ef"], soft: ["#ffffff", "#bdeeff"], accent: ["#8ce9ff", "#8c9cff"], egg: ["#ffffff", "#d2f3ff", "#93c6f6"] },
+  bosque: { body: ["#d7ab72", "#a56d43", "#6c4630"], soft: ["#c2f39b", "#5fb96d"], accent: ["#e3fba8", "#63c478"], egg: ["#f7fbe0", "#d3ea9f", "#8fbd6c"] },
+  nube: { body: ["#ffffff", "#e6f2ff", "#bfd2f4"], soft: ["#ffffff", "#ddf7ff"], accent: ["#f6b8ff", "#93dfff"], egg: ["#ffffff", "#eef1ff", "#c9d1f3"] },
 };
 
 /** La nube se va cargando de tormenta: cada etapa oscurece su cuerpo. */
@@ -656,27 +739,40 @@ function colorsFor(kind: PetKind, stageIndex: number) {
 
 /** La escala remata el salto: de cría diminuta a criatura desarrollada. */
 const STAGE_SCALE = [0.44, 0.58, 0.72, 0.86, 1, 1.1];
+/** El huevo es algo mayor que la cría que sale de él. */
+const EGG_SCALE = 0.55;
 
 export default function PetAvatar({
   kind,
   stage,
   mood,
+  eggPhase = null,
   size = "normal",
 }: {
   kind: PetKind;
   stage: PetStage;
   mood: PetMood;
+  /** Fase del huevo mientras nace; una criatura caída se pinta siempre como criatura. */
+  eggPhase?: EggPhase | null;
   size?: "tiny" | "small" | "normal" | "large";
 }) {
   const rawId = useId().replaceAll(":", "");
-  const ids = { body: `pet-body-${rawId}`, soft: `pet-soft-${rawId}`, accent: `pet-accent-${rawId}` };
+  const ids = { body: `pet-body-${rawId}`, soft: `pet-soft-${rawId}`, accent: `pet-accent-${rawId}`, egg: `pet-egg-${rawId}` };
   const stageIndex = Math.max(0, PET_STAGES.findIndex((item) => item.id === stage));
   const colors = colorsFor(kind, stageIndex);
-  const scale = STAGE_SCALE[stageIndex] ?? 1;
+  const hatching = mood === "fallecida" ? null : eggPhase;
+  const inEgg = hatching !== null && hatching < 4 ? (hatching as 0 | 1 | 2 | 3) : null;
+  const scale = inEgg !== null ? EGG_SCALE : STAGE_SCALE[stageIndex] ?? 1;
   const Drawing = DRAWINGS[kind];
+  const name = PET_DETAILS[kind].name;
+  const label = inEgg !== null
+    ? `${name}, huevo, día ${inEgg + 1}`
+    : hatching === 4
+      ? `${name}, recién nacida, ${mood}`
+      : `${name}, ${PET_STAGES[stageIndex]?.label ?? stage}, ${mood}`;
 
   return (
-    <div className={`pet-avatar pet-avatar-${size} pet-avatar-${kind} pet-avatar-${mood}`} role="img" aria-label={`${PET_DETAILS[kind].name}, ${PET_STAGES[stageIndex]?.label ?? stage}, ${mood}`}>
+    <div className={`pet-avatar pet-avatar-${size} pet-avatar-${kind} pet-avatar-${mood}${inEgg !== null ? " pet-avatar-egg" : ""}`} role="img" aria-label={label}>
       <span className="pet-avatar-aura" aria-hidden="true" />
       <svg viewBox="0 0 160 160" aria-hidden="true">
         <defs>
@@ -684,6 +780,11 @@ export default function PetAvatar({
             <stop offset="0%" stopColor={colors.body[0]} />
             <stop offset="58%" stopColor={colors.body[1]} />
             <stop offset="100%" stopColor={colors.body[2]} />
+          </radialGradient>
+          <radialGradient id={ids.egg} cx="38%" cy="28%" r="80%">
+            <stop offset="0%" stopColor={colors.egg[0]} />
+            <stop offset="60%" stopColor={colors.egg[1]} />
+            <stop offset="100%" stopColor={colors.egg[2]} />
           </radialGradient>
           <linearGradient id={ids.soft} x1="0" y1="0" x2="1" y2="1">
             <stop offset="0%" stopColor={colors.soft[0]} />
@@ -696,7 +797,14 @@ export default function PetAvatar({
         </defs>
         <ellipse cx="80" cy={142 - (1 - scale) * 6} rx={16 + 28 * scale} ry={4 + 4.5 * scale} fill="rgba(15,44,68,.12)" />
         <g style={{ transform: `translate(80px, 84px) scale(${scale}) translate(-80px, -84px)` }}>
-          <Drawing stageIndex={stageIndex} mood={mood} ids={ids} />
+          {inEgg !== null ? (
+            <Egg phase={inEgg} ids={ids} />
+          ) : (
+            <>
+              {hatching === 4 ? <HatchShells ids={ids} /> : null}
+              <Drawing stageIndex={stageIndex} mood={mood} ids={ids} />
+            </>
+          )}
         </g>
       </svg>
     </div>

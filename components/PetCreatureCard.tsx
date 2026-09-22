@@ -5,7 +5,9 @@ import { PET_DETAILS, PET_STAGES } from "@/lib/social/domain";
 import type { CreatureEntry } from "@/lib/cloud/social";
 
 function statusLine({ state, garden }: CreatureEntry) {
-  if (!state.alive) return "Revive con 60 min";
+  if (!state.alive) {
+    return state.rebirthInDays === 1 ? "Último día: 60 min la reviven" : `Revive con 60 min · huevo en ${state.rebirthInDays} días`;
+  }
   if (!garden) return "Nace al criar con un amigo";
 
   const { life, currentUserId, friend } = garden;
@@ -29,7 +31,7 @@ export default function PetCreatureCard({ entry, size = "normal" }: { entry: Cre
   return (
     <article className={`pet-creature pet-creature-${state.kind} ${state.alive ? "" : "is-fallen"}`}>
       <div className="pet-creature-stage">
-        <PetAvatar kind={state.kind} stage={state.stage} mood={state.mood} size={size === "large" ? "large" : "normal"} />
+        <PetAvatar kind={state.kind} stage={state.stage} mood={state.mood} eggPhase={state.eggPhase} size={size === "large" ? "large" : "normal"} />
       </div>
 
       <div className="pet-creature-foot">

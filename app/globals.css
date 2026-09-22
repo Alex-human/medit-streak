@@ -622,6 +622,9 @@ html[data-time-phase="night"] {
 .pet-tail { transform-origin: 118px 100px; animation: tailWave 1.8s ease-in-out infinite; }
 .pet-sprout { transform-origin: 80px 57px; animation: sproutSway 2.6s ease-in-out infinite; }
 .pet-wings { transform-origin: 80px 84px; animation: wingFlutter 2.2s ease-in-out infinite; }
+.pet-egg { transform-origin: 80px 128px; animation: eggWobble 2.8s ease-in-out infinite; }
+.pet-egg-hatching { animation: eggShake 1.3s ease-in-out infinite; }
+.pet-avatar-egg .pet-avatar-aura { opacity: .3; }
 
 /* ---------- Mascotas: carrusel deslizable ---------- */
 .pet-empty { display: flex; align-items: center; justify-content: space-between; gap: .6rem; }
@@ -677,6 +680,8 @@ html[data-time-phase="night"] {
 @keyframes tailWave { 0%, 100% { transform: rotate(-5deg); } 50% { transform: rotate(8deg); } }
 @keyframes sproutSway { 0%, 100% { transform: rotate(-2deg); } 50% { transform: rotate(4deg); } }
 @keyframes wingFlutter { 0%, 100% { transform: scaleX(1) rotate(0); } 50% { transform: scaleX(.94) rotate(-1deg); } }
+@keyframes eggWobble { 0%, 100% { transform: rotate(-3deg); } 50% { transform: rotate(3deg); } }
+@keyframes eggShake { 0%, 55%, 100% { transform: rotate(0); } 10% { transform: rotate(-6deg); } 20% { transform: rotate(5deg); } 30% { transform: rotate(-4deg); } 40% { transform: rotate(3deg); } }
 @keyframes shelfShimmer { to { background-position-x: -220%; } }
 
 @keyframes softReveal {
@@ -724,6 +729,7 @@ html[data-time-phase="night"] {
   .pet-tail,
   .pet-sprout,
   .pet-wings,
+  .pet-egg,
   .auth-creature,
   .pet-shelf-loading {
     animation: none !important;

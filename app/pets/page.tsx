@@ -9,7 +9,7 @@ import { creatureEntries, loadSocialSnapshot, type CreatureEntry, type GardenCar
 import { PET_KINDS } from "@/lib/social/domain";
 
 const PREVIEW_ENTRIES: CreatureEntry[] = PET_KINDS.map((kind) => ({
-  state: { kind, alive: true, bornDay: "", diedDay: null, bondDays: 0, stage: "origen", mood: "dormida" },
+  state: { kind, alive: true, bornDay: "", diedDay: null, rebirthDay: null, rebirthInDays: null, bondDays: 0, stage: "origen", mood: "dormida", eggPhase: 0 },
 }));
 
 export default function PetsPage() {

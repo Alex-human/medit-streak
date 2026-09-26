@@ -7,7 +7,7 @@ import ChoicePanel from "./ChoicePanel";
 import PetAvatar from "./PetAvatar";
 import PetCreatureCard from "./PetCreatureCard";
 import { loadSocialSnapshot, type PetCard } from "@/lib/cloud/social";
-import { equippedItems } from "@/lib/social/catalog";
+import { equippedItems, itemName } from "@/lib/social/catalog";
 import { markRevealed, splitReveal } from "@/lib/social/reveal";
 
 export default function PetShelf({ celebrate, onCelebrationClose }: { celebrate: boolean; onCelebrationClose: () => void }) {
@@ -79,7 +79,7 @@ export default function PetShelf({ celebrate, onCelebrationClose }: { celebrate:
               <div key={card.pet.id} className="grid gap-2">
                 <PetCreatureCard card={card} items={equippedItems(card.pet.outfit, card.owned)} />
                 {reveals[index].fresh.length > 0 ? (
-                  <p className="text-sm text-center"><strong>Estreno:</strong> {reveals[index].fresh.map((item) => item.label).join(", ")}</p>
+                  <p className="text-sm text-center"><strong>Estreno:</strong> {reveals[index].fresh.map(itemName).join(", ")}</p>
                 ) : null}
               </div>
             ))}

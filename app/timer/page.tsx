@@ -9,16 +9,15 @@ import AuthScreen from "@/components/AuthScreen";
 import { useCloud } from "@/components/CloudProvider";
 import { loadSocialSnapshot } from "@/lib/cloud/social";
 import { toDayString } from "@/lib/dates";
-import { getStreakRecovery, STREAK_RECOVERY_MINUTES } from "@/lib/streak";
-import { PET_RESCUE_MINUTES } from "@/lib/social/domain";
+import { getStreakRecovery } from "@/lib/streak";
 import { getAllDays } from "@/lib/storage/repository";
 import { saveCompletedTimer } from "@/lib/timerCompletion";
 
 export default function TimerPage() {
   const router = useRouter();
   const cloud = useCloud();
-  const [recoveryAvailable, setRecoveryAvailable] = useState(false);
-  const [petCareMode, setPetCareMode] = useState<"rescue" | "revive" | null>(null);
+  const [streakMinutes, setStreakMinutes] = useState(0);
+  const [petMinutes, setPetMinutes] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -26,21 +25,14 @@ export default function TimerPage() {
     const syncRecovery = async () => {
       const records = await getAllDays();
       if (!active) return;
-      setRecoveryAvailable(getStreakRecovery(records, toDayString(new Date())).available);
+      setStreakMinutes(getStreakRecovery(records, toDayString(new Date()))?.minutes ?? 0);
       if (cloud.user) {
         try {
           const snapshot = await loadSocialSnapshot();
-          if (active) {
-            setPetCareMode(
-              snapshot.pets.some((card) => card.life.alerts.some((alert) => alert.userId === cloud.user?.id && alert.minutes === 60))
-                ? "rescue"
-                : snapshot.pets.some((card) => card.life.phase === "fallen")
-                  ? "revive"
-                  : null,
-            );
-          }
+          const mine = snapshot.pets.flatMap((card) => card.life.alerts).filter((alert) => alert.userId === cloud.user?.id);
+          if (active) setPetMinutes(Math.max(0, ...mine.map((alert) => alert.minutes)));
         } catch {
-          if (active) setPetCareMode(null);
+          if (active) setPetMinutes(0);
         }
       }
     };
@@ -83,7 +75,8 @@ export default function TimerPage() {
   }
   if (cloud.configured && !cloud.user) return <AuthScreen />;
 
-  const targetMinutes = petCareMode ? PET_RESCUE_MINUTES : recoveryAvailable ? STREAK_RECOVERY_MINUTES : 10;
+  // La racha propia y la de la mascota usan la misma escalera: basta con cumplir la que más pide.
+  const rescueMinutes = Math.max(streakMinutes, petMinutes);
 
   return (
     <>
@@ -105,37 +98,20 @@ export default function TimerPage() {
             <div className="text-sm muted mt-1">Silencio guiado por tiempo real, incluso en segundo plano.</div>
           </div>
 
-          {recoveryAvailable && !petCareMode ? (
-            <div className="recovery-panel p-4">
-              <div className="text-xs muted">Racha recuperable</div>
-              <div className="glass-title text-lg font-semibold mt-1">
-                Completa 30 min para recuperar ayer.
-              </div>
+          {rescueMinutes > 0 ? (
+            <div className={petMinutes > 0 ? "danger-panel p-4" : "recovery-panel p-4"}>
+              <div className="text-xs muted">{petMinutes > 0 ? "Vuestra mascota te necesita" : "Racha recuperable"}</div>
+              <div className="glass-title text-lg font-semibold mt-1">Completa {rescueMinutes} min para recuperar la racha.</div>
             </div>
           ) : null}
 
-          {petCareMode ? (
-            <div className="danger-panel p-4">
-              <div className="text-xs muted">{petCareMode === "revive" ? "Vuestra mascota espera volver" : "Vuestra mascota está en peligro"}</div>
-              <div className="glass-title text-lg font-semibold mt-1">
-                {petCareMode === "revive" ? "Completa 60 min para revivir a vuestra mascota." : "Completa 60 min para proteger a vuestra mascota."}
-              </div>
-            </div>
-          ) : null}
-
-          <TimerCard
-            initialMinutes={targetMinutes}
-            highlightedMinutes={petCareMode ? PET_RESCUE_MINUTES : recoveryAvailable ? STREAK_RECOVERY_MINUTES : undefined}
-            onFinish={onFinish}
-          />
+          <TimerCard initialMinutes={rescueMinutes || 10} highlightedMinutes={rescueMinutes || undefined} onFinish={onFinish} />
 
           <div className="glass-panel p-4 text-sm muted">
-            {petCareMode
-              ? petCareMode === "revive"
-                ? "Una hora completada devuelve a la mascota caída."
-                : "Una hora completada hoy evita que vuestra mascota caiga."
-              : recoveryAvailable
-                ? "Al terminar 30 min, se marcarán hoy y ayer."
+            {rescueMinutes > 0
+              ? streakMinutes > 0
+                ? `Al terminar ${rescueMinutes} min se marcan hoy y los días que te faltaban.`
+                : `Al terminar ${rescueMinutes} min vuestra mascota recupera tu día.`
               : "Al terminar, se marcará “hoy” como meditado y volverás al inicio."}
           </div>
         </div>

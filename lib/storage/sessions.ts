@@ -1,5 +1,6 @@
 import { Capacitor } from "@capacitor/core";
-import { addDays } from "@/lib/dates";
+import { rescueMinutes } from "@/lib/rescue";
+import { recoveredDays } from "@/lib/streak";
 import { MeditCloudStore } from "@/lib/native/meditCloudStore";
 
 export type MeditationSession = {
@@ -534,75 +535,31 @@ export async function addSession(
   throw new Error(`No se pudo guardar la sesión de meditación para ${day}.`);
 }
 
-export async function addTimerSessionWithRecovery(
-  day: string,
-  minutes: number,
-  createdAt: number,
-  sessionId: string,
-  recoveryMinutes: number,
-): Promise<{ day: DayRecord; recoveredDay: DayRecord | null }> {
+/** Guarda una sesión de cronómetro y, con la escalera de rescate, marca los días fallados que recupera. */
+export async function addTimerSessionWithRecovery(day: string, minutes: number, createdAt: number, sessionId: string): Promise<DayRecord> {
   const normalizedMinutes = Math.max(1, Math.round(minutes));
-  const missedDay = addDays(day, -1);
-  const anchorDay = addDays(day, -2);
 
   for (let attempt = 0; attempt < 2; attempt += 1) {
     const latestMap = await loadAllMap();
-    const shouldRecover =
-      normalizedMinutes >= recoveryMinutes &&
-      !(latestMap[missedDay]?.completed ?? false) &&
-      (latestMap[anchorDay]?.completed ?? false);
-
-    const savedDay = addSessionToMap(latestMap, day, normalizedMinutes, createdAt, sessionId);
-    const savedRecoveryDay = shouldRecover
-      ? addSessionToMap(
-          latestMap,
-          missedDay,
-          recoveryMinutes,
-          createdAt,
-          `${sessionId}-recovery-${missedDay}`,
-        )
-      : null;
-
+    const completed = Object.values(latestMap).filter((record) => record.completed).map((record) => record.day);
+    // En local cada sesión cuenta sola: las sesiones guardadas aquí no distinguen cronómetro de registro a mano.
+    const written = recoveredDays(completed, { [day]: normalizedMinutes }).map((missedDay) => {
+      const id = `${sessionId}-recovery-${missedDay}`;
+      return { id, record: addSessionToMap(latestMap, missedDay, rescueMinutes(missedDay, day) ?? 1, createdAt, id) };
+    });
+    written.push({ id: sessionId, record: addSessionToMap(latestMap, day, normalizedMinutes, createdAt, sessionId) });
     await persistMap(latestMap);
 
     const verifiedMap = await loadAllMap();
-    const verifiedDay = verifiedMap[day];
-    const verifiedRecoveryDay = savedRecoveryDay ? verifiedMap[missedDay] : null;
-    const savedSession = savedDay.sessions.find((session) => session.id === sessionId);
-    const savedRecoverySession = savedRecoveryDay?.sessions.find((session) => session.id === `${sessionId}-recovery-${missedDay}`);
-    const dayVerified =
-      Boolean(savedSession) &&
-      Boolean(
-        verifiedDay?.sessions.some(
-          (session) => session.id === savedSession?.id && session.version === savedSession?.version,
-        ),
-      );
-    const recoveryVerified =
-      !savedRecoveryDay ||
-      (Boolean(savedRecoverySession) &&
-        Boolean(
-          verifiedRecoveryDay?.sessions.some(
-            (session) => session.id === savedRecoverySession?.id && session.version === savedRecoverySession?.version,
-          ),
-        ));
-
-    if (dayVerified && recoveryVerified && verifiedDay) {
-      return {
-        day: verifiedDay,
-        recoveredDay: verifiedRecoveryDay ?? null,
-      };
-    }
+    const verified = written.every(({ id, record }) => {
+      const version = record.sessions.find((session) => session.id === id)?.version;
+      return verifiedMap[record.day]?.sessions.some((stored) => stored.id === id && stored.version === version);
+    });
+    if (verified && verifiedMap[day]) return verifiedMap[day];
   }
 
-  const fallbackMap = await loadAllMap();
-  const fallbackDay = fallbackMap[day];
-  if (fallbackDay?.sessions.some((session) => session.id === sessionId)) {
-    return {
-      day: fallbackDay,
-      recoveredDay: fallbackMap[missedDay] ?? null,
-    };
-  }
-
+  const fallback = (await loadAllMap())[day];
+  if (fallback?.sessions.some((session) => session.id === sessionId)) return fallback;
   throw new Error(`No se pudo guardar la sesión de meditación para ${day}.`);
 }
 

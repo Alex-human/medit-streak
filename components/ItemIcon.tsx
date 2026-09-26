@@ -1,6 +1,6 @@
 import { useId } from "react";
-import { ITEM_DRAWINGS, ITEM_GRADIENTS, ItemDefs, type ItemIds } from "./PetItems";
-import type { CatalogItem, Slot } from "@/lib/social/catalog";
+import { ITEM_GRADIENTS, ItemDefs, ItemPiece, type ItemIds } from "./PetItems";
+import type { OwnedItem, Slot } from "@/lib/social/catalog";
 
 /** Encuadre de cada hueco para enseñar la pieza sola, sin criatura. */
 const FRAME: Record<Slot, string> = {
@@ -12,14 +12,14 @@ const FRAME: Record<Slot, string> = {
   suelo: "translate(0 12) scale(0.75)",
 };
 
-export default function ItemIcon({ item }: { item: CatalogItem }) {
+/** La pieza sola, pintada al nivel que tiene o al que llegaría. */
+export default function ItemIcon({ item }: { item: OwnedItem }) {
   const rawId = useId().replaceAll(":", "");
   const ids = Object.fromEntries(ITEM_GRADIENTS.map((key) => [key, `icon-${key}-${rawId}`])) as ItemIds;
-  const draw = ITEM_DRAWINGS[item.id];
   return (
     <svg className="pet-item-icon" viewBox="-46 -46 92 92" aria-hidden="true">
       <defs><ItemDefs ids={ids} /></defs>
-      <g transform={FRAME[item.slot]}>{draw ? draw(ids) : null}</g>
+      <g transform={FRAME[item.slot]}><ItemPiece id={item.id} level={item.level} ids={ids} /></g>
     </svg>
   );
 }

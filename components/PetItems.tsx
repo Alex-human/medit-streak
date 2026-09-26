@@ -1,7 +1,8 @@
 import type { ReactNode } from "react";
+import type { ItemLevel } from "@/lib/social/catalog";
 
-/** Degradados compartidos por todas las piezas; cada avatar los declara con sus propios ids. */
-export const ITEM_GRADIENTS = ["gold", "wood", "crimson", "rose", "night", "plum", "bronze", "lantern", "wind", "ember", "magma", "ice", "aqua", "leaf", "glow"] as const;
+/** Degradados compartidos por las piezas y las formas altas; cada avatar los declara con sus propios ids. */
+export const ITEM_GRADIENTS = ["gold", "wood", "crimson", "rose", "night", "plum", "bronze", "lantern", "wind", "ember", "magma", "ice", "aqua", "leaf", "gilded", "prism", "moon", "glow"] as const;
 export type ItemIds = Record<(typeof ITEM_GRADIENTS)[number], string>;
 
 const LINEAR: Record<Exclude<keyof ItemIds, "glow">, string[]> = {
@@ -19,6 +20,9 @@ const LINEAR: Record<Exclude<keyof ItemIds, "glow">, string[]> = {
   ice: ["#ffffff", "#cdf2ff", "#79b4ff"],
   aqua: ["#dcfbff", "#4cc9ea", "#2b6fd6"],
   leaf: ["#eaffb8", "#7fd46c", "#2e8b4b"],
+  gilded: ["#fffbe0", "#ffd65a", "#d08f1c"],
+  prism: ["#fff0fb", "#c9b6ff", "#7fdcff"],
+  moon: ["#fffdf2", "#fff1b8", "#f0c766"],
 };
 
 export function ItemDefs({ ids }: { ids: ItemIds }) {
@@ -45,6 +49,26 @@ const EDGE = "rgba(255,255,255,.85)";
 
 export function Spark({ x, y, r = 3, fill = "#fff6bd" }: { x: number; y: number; r?: number; fill?: string }) {
   return <path d={`M${x} ${y - r}q${r * 0.22} ${r * 0.78} ${r} ${r}q-${r * 0.78} ${r * 0.22} -${r} ${r}q-${r * 0.22} -${r * 0.78} -${r} -${r}q${r * 0.78} -${r * 0.22} ${r} -${r}Z`} fill={fill} />;
+}
+
+/** Una pieza a su nivel: la de oro y la celestial cambian toda su pintura, y la celestial brilla por detrás. */
+export function ItemPiece({ id, level, ids }: { id: string; level: ItemLevel; ids: ItemIds }) {
+  const draw = ITEM_DRAWINGS[id];
+  if (!draw) return null;
+  const tone = level === 2 ? ids.gilded : ids.prism;
+  const paint = level === 1 ? ids : (Object.fromEntries(ITEM_GRADIENTS.map((key) => [key, key === "glow" ? ids.glow : tone])) as ItemIds);
+  return (
+    <>
+      {level === 3 ? (
+        <g>
+          <circle r="26" fill={url(ids.glow)} />
+          <Spark x={-20} y={-14} r={3.4} fill="#f4ecff" />
+          <Spark x={21} y={-4} r={2.6} fill="#e3f8ff" />
+        </g>
+      ) : null}
+      {draw(paint)}
+    </>
+  );
 }
 
 /** Espejo horizontal para dibujar el lado izquierdo de alas, cuernos y astas. */
@@ -189,6 +213,91 @@ export const ITEM_DRAWINGS: Record<string, (ids: ItemIds) => ReactNode> = {
     </g>
   ),
 
+  yinyang: (ids) => (
+    <g>
+      <path d="M-16 -3Q-14 10 0 12Q14 10 16 -3" fill="none" stroke={url(ids.night)} strokeWidth="1.8" />
+      <circle cy="12" r="2.2" fill={url(ids.gold)} />
+      <g transform="translate(0 22)">
+        <circle r="9.5" fill={url(ids.glow)} />
+        <circle r="8.5" fill="#fffdf6" stroke={url(ids.gold)} strokeWidth="2.2" />
+        <path d="M0 -8.5A8.5 8.5 0 0 1 0 8.5A4.25 4.25 0 0 1 0 0A4.25 4.25 0 0 0 0 -8.5Z" fill="#2c2540" />
+        <circle cy="-4.25" r="1.5" fill="#2c2540" />
+        <circle cy="4.25" r="1.5" fill="#fffdf6" />
+      </g>
+    </g>
+  ),
+
+  guirnalda: (ids) => (
+    <g>
+      <path d="M-22 -2Q-18 14 0 16Q18 14 22 -2" fill="none" stroke="#3f9a55" strokeWidth="2" />
+      {[[-21, 1], [-17, 8], [-10, 13], [-3, 15.5], [4, 15.5], [11, 13], [17, 8], [21, 1]].map(([x, y], index) => (
+        <g key={`${x}-${y}`} transform={`translate(${x} ${y})`}>
+          {[0, 72, 144, 216, 288].map((angle) => (
+            <ellipse key={angle} cy="-2.6" rx="2.2" ry="2.8" fill={[url(ids.rose), url(ids.lantern), "#ffffff", url(ids.plum)][index % 4]} stroke="rgba(255,255,255,.7)" strokeWidth=".5" transform={`rotate(${angle})`} />
+          ))}
+          <circle r="1.4" fill={url(ids.gold)} />
+        </g>
+      ))}
+    </g>
+  ),
+
+  abanico: (ids) => (
+    <g>
+      <path d="M0 0L-22.5 -13A26 26 0 0 1 22.5 -13Z" fill={url(ids.rose)} stroke={EDGE} strokeWidth="1.2" strokeLinejoin="round" />
+      {[150, 130, 110, 90, 70, 50, 30].map((angle) => (
+        <path key={angle} d={`M0 0L${(26 * Math.cos((angle * Math.PI) / 180)).toFixed(1)} ${(-26 * Math.sin((angle * Math.PI) / 180)).toFixed(1)}`} stroke="rgba(143,16,48,.35)" strokeWidth="1" />
+      ))}
+      <path d="M-22.5 -13A26 26 0 0 1 22.5 -13" fill="none" stroke={url(ids.gold)} strokeWidth="2.4" />
+      <g transform="translate(-5 -17)">
+        {[0, 72, 144, 216, 288].map((angle) => <ellipse key={angle} cy="-2.4" rx="2" ry="2.6" fill="#ffffff" transform={`rotate(${angle})`} />)}
+        <circle r="1.3" fill={url(ids.gold)} />
+      </g>
+      <path d="M0 0v10" stroke={url(ids.wood)} strokeWidth="3" strokeLinecap="round" />
+      <circle r="2.2" fill={url(ids.gold)} stroke={EDGE} strokeWidth=".8" />
+      <path d="M-1 10l-2 9M1 10l2 9" stroke={url(ids.crimson)} strokeWidth="1.4" strokeLinecap="round" />
+    </g>
+  ),
+
+  orbe: (ids) => (
+    <g>
+      <circle cy="-16" r="20" fill={url(ids.glow)} />
+      <path d="M-9 -5q9 7 18 0l-4 7h-10z" fill={url(ids.gold)} stroke={EDGE} strokeWidth=".9" strokeLinejoin="round" />
+      <circle cy="-16" r="11" fill={url(ids.aqua)} stroke={EDGE} strokeWidth="1.3" />
+      <path d="M-6 -12c3 4 9 4 12-1M-7 -19c4-3 9-3 13 1" fill="none" stroke="rgba(255,255,255,.55)" strokeWidth="1.4" strokeLinecap="round" />
+      <ellipse cx="-4" cy="-21" rx="3.4" ry="2" fill="rgba(255,255,255,.85)" transform="rotate(-30 -4 -21)" />
+      <Spark x={12} y={-30} r={3} />
+      <Spark x={-13} y={-4} r={2} />
+    </g>
+  ),
+
+  bonsai: (ids) => (
+    <g transform="translate(38 -2)">
+      <path d="M-12 -9h24l-3 9h-18Z" fill={url(ids.night)} stroke={EDGE} strokeWidth="1.1" strokeLinejoin="round" />
+      <rect x="-14" y="-12" width="28" height="4" rx="2" fill={url(ids.gold)} />
+      <path d="M1 -12c-2-7 5-10 1-17-3-5-8-6-10-11M2 -26c4-3 9-3 12-8" fill="none" stroke={url(ids.wood)} strokeWidth="3.2" strokeLinecap="round" />
+      <g fill={url(ids.leaf)} stroke={EDGE} strokeWidth="1">
+        <ellipse cx="-10" cy="-42" rx="10" ry="5.5" />
+        <ellipse cx="14" cy="-36" rx="8.5" ry="4.8" />
+        <ellipse cx="0" cy="-51" rx="7.5" ry="4.4" />
+      </g>
+      <circle cx="-4" cy="-13" r="2.4" fill={url(ids.leaf)} />
+    </g>
+  ),
+
+  gong: (ids) => (
+    <g transform="translate(-38 0)">
+      <path d="M-14 0V-44M14 0V-44" stroke={url(ids.wood)} strokeWidth="3.2" strokeLinecap="round" />
+      <path d="M-20 -46c6 2 34 2 40 0" fill="none" stroke={url(ids.crimson)} strokeWidth="4" strokeLinecap="round" />
+      <path d="M-6 -44l3 8M6 -44l-3 8" stroke="rgba(255,255,255,.7)" strokeWidth="1" />
+      <circle cy="-24" r="12" fill={url(ids.bronze)} stroke={EDGE} strokeWidth="1.2" />
+      <circle cy="-24" r="8" fill="none" stroke="rgba(143,83,34,.45)" strokeWidth="1.2" />
+      <circle cy="-24" r="3.4" fill={url(ids.gold)} />
+      <ellipse cx="-4" cy="-29" rx="3.6" ry="2" fill="rgba(255,255,255,.55)" transform="rotate(-30 -4 -29)" />
+      <path d="M16 -4l10 -10" stroke={url(ids.wood)} strokeWidth="2.2" strokeLinecap="round" />
+      <circle cx="26" cy="-14" r="3" fill="#e9c7a4" stroke={EDGE} strokeWidth=".8" />
+    </g>
+  ),
+
   "alas-pegaso": (ids) => (
     <Mirrored>
       <g>
@@ -290,9 +399,9 @@ export const ITEM_DRAWINGS: Record<string, (ids: ItemIds) => ReactNode> = {
   "alas-hoja": (ids) => (
     <Mirrored>
       <g stroke={EDGE} strokeWidth="1.3" strokeLinejoin="round">
-        <path d="M4 0C20-30 46-42 74-34C56-20 38-8 8 4Z" fill="#5fb96d" transform="rotate(-16)" />
+        <path d="M4 0C20-30 46-42 74-34C56-20 38-8 8 4Z" fill={url(ids.leaf)} transform="rotate(-16)" opacity=".75" />
         <path d="M4 0C20-30 46-42 74-34C56-20 38-8 8 4Z" fill={url(ids.leaf)} />
-        <path d="M4 0C20-30 46-42 74-34C56-20 38-8 8 4Z" fill="#c2f39b" transform="rotate(18)" opacity=".95" />
+        <path d="M4 0C20-30 46-42 74-34C56-20 38-8 8 4Z" fill={url(ids.leaf)} transform="rotate(18)" opacity=".6" />
         <path d="M8-1C30-20 50-28 68-32M10 6C32-6 50-10 66-12" fill="none" stroke="rgba(46,139,75,.5)" strokeWidth="1.1" strokeLinecap="round" />
         <circle cx="66" cy="-38" r="2.4" fill="#ffd5e7" />
       </g>
@@ -325,7 +434,7 @@ export const ITEM_DRAWINGS: Record<string, (ids: ItemIds) => ReactNode> = {
     <g>
       <path d="M0 0c10-2 18-10 16-22" fill="none" stroke="#3f9a55" strokeWidth="2.2" strokeLinecap="round" />
       {[-8, -34, -60].map((angle, index) => (
-        <path key={angle} d="M0 0C8-7 20-9 30-4C20 3 8 5 0 0Z" fill={index === 1 ? url(ids.leaf) : index === 0 ? "#5fb96d" : "#c2f39b"} stroke={EDGE} strokeWidth="1.1" transform={`rotate(${angle})`} />
+        <path key={angle} d="M0 0C8-7 20-9 30-4C20 3 8 5 0 0Z" fill={url(ids.leaf)} opacity={[0.8, 1, 0.6][index]} stroke={EDGE} strokeWidth="1.1" transform={`rotate(${angle})`} />
       ))}
       <path d="M2-1C10-5 18-6 26-4" fill="none" stroke="rgba(46,139,75,.45)" strokeWidth=".9" transform="rotate(-34)" />
       <circle cx="16" cy="-24" r="2.4" fill="#ffd5e7" stroke={EDGE} strokeWidth=".8" />

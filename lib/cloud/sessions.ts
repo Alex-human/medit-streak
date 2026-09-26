@@ -1,7 +1,6 @@
 import { getCloudClient, getSignedInUserId } from "./client";
 import type { DayRecord, MeditationSession } from "@/lib/storage/sessions";
-import { addDays } from "@/lib/dates";
-import { STREAK_RESCUE_MINUTES } from "@/lib/social/domain";
+import { recoveredDays } from "@/lib/streak";
 
 type CloudSessionRow = {
   client_id: string;
@@ -39,26 +38,20 @@ function rowsToDays(rows: CloudSessionRow[]): DayRecord[] {
     })
     .sort((left, right) => left.day.localeCompare(right.day));
 
-  const recordMap = new Map(records.map((record) => [record.day, record]));
-  for (const day of Object.keys(byDay).sort()) {
-    const timerMinutes = byDay[day]
-      .filter((row) => row.source === "timer")
-      .reduce((total, row) => total + row.minutes, 0);
-    const missedDay = addDays(day, -1);
-    const anchorDay = addDays(day, -2);
-    if (timerMinutes >= STREAK_RESCUE_MINUTES && !recordMap.has(missedDay) && recordMap.get(anchorDay)?.completed) {
-      recordMap.set(missedDay, {
-        day: missedDay,
-        minutes: 0,
-        completed: true,
-        updatedAt: new Date(`${day}T23:59:59Z`).getTime(),
-        sessions: [],
-        tombstones: {},
-      });
-    }
-  }
+  const timerTotals = rows.reduce<Record<string, number>>((totals, row) => {
+    if (row.source === "timer") totals[row.day] = (totals[row.day] ?? 0) + row.minutes;
+    return totals;
+  }, {});
+  const recovered = recoveredDays(records.map((record) => record.day), timerTotals).map((day) => ({
+    day,
+    minutes: 0,
+    completed: true,
+    updatedAt: new Date(`${day}T23:59:59Z`).getTime(),
+    sessions: [],
+    tombstones: {},
+  }));
 
-  return [...recordMap.values()].sort((left, right) => left.day.localeCompare(right.day));
+  return [...records, ...recovered].sort((left, right) => left.day.localeCompare(right.day));
 }
 
 async function currentUser() {

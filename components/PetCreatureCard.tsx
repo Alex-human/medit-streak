@@ -2,7 +2,7 @@
 
 import PetAvatar from "./PetAvatar";
 import { EGG_DAYS, PET_STAGES } from "@/lib/social/domain";
-import type { CatalogItem } from "@/lib/social/catalog";
+import type { OwnedItem } from "@/lib/social/catalog";
 import type { PetCard } from "@/lib/cloud/social";
 
 export function petName(card: PetCard) {
@@ -10,21 +10,20 @@ export function petName(card: PetCard) {
 }
 
 /** Una línea por persona con deberes hoy (los dos ven quién falta), o el resumen del día si no hay ninguno. */
-function statusLines({ life, currentUserId, friend }: PetCard): string[] {
-  if (life.phase === "fallen") {
-    return [life.rebirthInDays === 1 ? "Último día: 60 min de cualquiera la reviven" : `Revive con 60 min de cualquiera · huevo en ${life.rebirthInDays} días`];
-  }
+function statusLines(card: PetCard): string[] {
+  const { life, currentUserId, friend } = card;
   if (life.identityDue) return [life.bondDays >= EGG_DAYS ? "Quiere nacer: falta el nombre" : "Mañana nace: elegid nombre y elemento"];
 
   const name = friend.display_name;
   const lines = [currentUserId, friend.user_id].flatMap((userId) => {
     const me = userId === currentUserId;
     const alert = life.alerts.find((item) => item.userId === userId);
-    if (alert?.minutes === 60) {
-      if (alert.daysLeft === 0) return [me ? "Último día: te tocan 60 min de cronómetro" : `Último día: ${name} necesita 60 min de cronómetro`];
-      return [me ? `Tienes ${alert.daysLeft} días para hacer 60 min de cronómetro` : `${name} tiene ${alert.daysLeft} días para hacer 60 min de cronómetro`];
+    if (alert?.daysLeft === 0) {
+      return [me ? `Último día: haz ${alert.minutes} min de cronómetro o ${petName(card)} vuelve al huevo` : `Último día: ${name} tiene que hacer ${alert.minutes} min o ${petName(card)} vuelve al huevo`];
     }
-    if (alert) return [me ? "Hoy te tocan 30 min de cronómetro para recuperar la racha" : `Hoy ${name} tiene que hacer 30 min de cronómetro para recuperar la racha`];
+    if (alert) {
+      return [me ? `Hoy te tocan ${alert.minutes} min de cronómetro para recuperar la racha` : `Hoy ${name} tiene que hacer ${alert.minutes} min de cronómetro para recuperar la racha`];
+    }
     if (!life.ownersDoneToday.includes(userId)) return [me ? "Hoy te falta meditar a ti" : `Hoy falta ${name} por meditar`];
     return [];
   });
@@ -32,7 +31,7 @@ function statusLines({ life, currentUserId, friend }: PetCard): string[] {
 }
 
 /** La mascota con lo que lleva puesto. `items` son las piezas que esta persona ya ha estrenado. */
-export default function PetCreatureCard({ card, items, hiddenCount = 0, size = "normal" }: { card: PetCard; items: CatalogItem[]; hiddenCount?: number; size?: "normal" | "large" }) {
+export default function PetCreatureCard({ card, items, hiddenCount = 0, size = "normal" }: { card: PetCard; items: OwnedItem[]; hiddenCount?: number; size?: "normal" | "large" }) {
   const { life, identity } = card;
   const stageIndex = PET_STAGES.findIndex((item) => item.id === life.stage);
   const nextStage = PET_STAGES[stageIndex + 1];
@@ -42,7 +41,7 @@ export default function PetCreatureCard({ card, items, hiddenCount = 0, size = "
     : 100;
 
   return (
-    <article className={`pet-creature pet-creature-${identity?.element ?? "huevo"} ${life.phase === "fallen" ? "is-fallen" : ""}`}>
+    <article className={`pet-creature pet-creature-${identity?.element ?? "huevo"}`}>
       <div className="pet-creature-stage">
         <PetAvatar
           kind={identity?.element ?? null}

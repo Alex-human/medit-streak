@@ -6,12 +6,12 @@ import {
   dueChoices,
   identityOf,
   ownedItems,
-  type CatalogItem,
   type ChoicePayload,
   type ChoiceRow,
   type DueChoice,
   type Identity,
   type Outfit,
+  type OwnedItem,
   type Slot,
 } from "@/lib/social/catalog";
 import type { SocialProfile } from "@/components/CloudProvider";
@@ -44,7 +44,7 @@ export type PetCard = {
   life: PetLife;
   identity: Identity | null;
   choices: ChoiceRow[];
-  owned: CatalogItem[];
+  owned: OwnedItem[];
   due: DueChoice[];
 };
 

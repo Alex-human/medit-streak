@@ -9,7 +9,7 @@ import {
   type ActiveTimerSession,
 } from "@/lib/timerSession";
 
-const PRESETS = [5, 10, 15, 30, 60];
+const PRESETS = [5, 10, 15, 20, 30, 60];
 
 function normalizeMinutes(value: number) {
   return Number.isFinite(value) ? Math.max(1, Math.round(value)) : 10;
@@ -310,7 +310,7 @@ export default function TimerCard({
                 running || completionPending ? "opacity-45 cursor-not-allowed" : "",
               ].join(" ")}
               disabled={running || completionPending}
-              title={isRecoveryTarget ? "Recuperar racha con 30 min" : undefined}
+              title={isRecoveryTarget ? `Recuperar racha con ${p} min` : undefined}
             >
               {p} min
             </button>

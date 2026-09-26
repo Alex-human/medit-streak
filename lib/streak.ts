@@ -1,7 +1,6 @@
 import type { DayRecord } from "./storage/repository";
 import { addDays, toDayString } from "./dates";
-
-export const STREAK_RECOVERY_MINUTES = 30;
+import { RESCUE_LADDER, isRescued, oldestOpenRescue } from "./rescue";
 
 export function computeStreak(records: DayRecord[], today = new Date()): number {
   const completed = new Set(records.filter(r => r.completed).map(r => r.day));
@@ -22,15 +21,24 @@ export function computeStreak(records: DayRecord[], today = new Date()): number 
   return streak;
 }
 
+/**
+ * Días fallados que recupera el cronómetro de los días siguientes según la escalera, siempre que
+ * la víspera contara (meditada o ya recuperada): así una racha rota hace tiempo no revive sola.
+ */
+export function recoveredDays(completedDays: Iterable<string>, timerTotals: Record<string, number>) {
+  const completed = new Set(completedDays);
+  const candidates = [...new Set(Object.keys(timerTotals).flatMap((day) => RESCUE_LADDER.map((_, step) => addDays(day, -(step + 1)))))].sort();
+  const recovered: string[] = [];
+  for (const day of candidates) {
+    if (completed.has(day) || !completed.has(addDays(day, -1)) || !isRescued(day, timerTotals)) continue;
+    completed.add(day);
+    recovered.push(day);
+  }
+  return recovered;
+}
+
+/** Lo que pide hoy la racha, o null si no hay nada que recuperar. */
 export function getStreakRecovery(records: DayRecord[], todayDay: string) {
   const completed = new Set(records.filter((record) => record.completed).map((record) => record.day));
-  const missedDay = addDays(todayDay, -1);
-  const anchorDay = addDays(todayDay, -2);
-
-  return {
-    available: !completed.has(missedDay) && completed.has(anchorDay),
-    missedDay,
-    anchorDay,
-    requiredMinutes: STREAK_RECOVERY_MINUTES,
-  };
+  return oldestOpenRescue(todayDay, (day) => !completed.has(day) && completed.has(addDays(day, -1)));
 }

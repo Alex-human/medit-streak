@@ -34,19 +34,14 @@ export async function addSession(
   return local.addSession(day, minutes, createdAt, sessionId);
 }
 
-export async function addTimerSessionWithRecovery(
-  day: string,
-  minutes: number,
-  createdAt: number,
-  sessionId: string,
-  recoveryMinutes: number,
-) {
+/** En la nube los días recuperados se deducen al leer; en local se escriben junto a la sesión. */
+export async function addTimerSessionWithRecovery(day: string, minutes: number, createdAt: number, sessionId: string) {
   if (await usesCloud()) {
     const saved = await addCloudSession(day, minutes, createdAt, sessionId, "timer");
     if (!saved) throw new Error(`No se pudo guardar la sesión de meditación para ${day}.`);
-    return { day: saved, recoveredDay: null };
+    return saved;
   }
-  return local.addTimerSessionWithRecovery(day, minutes, createdAt, sessionId, recoveryMinutes);
+  return local.addTimerSessionWithRecovery(day, minutes, createdAt, sessionId);
 }
 
 export async function updateSession(day: string, sessionId: string, minutes: number) {

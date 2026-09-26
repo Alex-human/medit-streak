@@ -1,59 +1,9 @@
 import { useId, type ReactNode } from "react";
 import { PET_STAGES, type EggPhase, type PetKind, type PetMood, type PetStage } from "@/lib/social/domain";
-import type { CatalogItem, Slot } from "@/lib/social/catalog";
-import { AncestralAura, ITEM_DRAWINGS, ITEM_GRADIENTS, ItemDefs, Spark as Sparkle, type ItemIds } from "./PetItems";
-
-/** Ojos grandes y brillantes: la cara sigue siendo mona en todas las evoluciones. */
-function Face({ mood, y = 92, x = 80 }: { mood: PetMood; y?: number; x?: number }) {
-  const sleeping = mood === "dormida";
-  const worried = mood === "peligro" || mood === "recuperable";
-
-  if (mood === "fallecida") {
-    return (
-      <g stroke="rgba(31,45,57,.72)" strokeWidth="3.6" strokeLinecap="round">
-        <path d={`M${x - 18} ${y - 6}l9 9m0-9-9 9M${x + 9} ${y - 6}l9 9m0-9-9 9`} />
-        <path d={`M${x - 6} ${y + 18}h12`} />
-      </g>
-    );
-  }
-
-  return (
-    <g>
-      {sleeping ? (
-        <g fill="none" stroke="rgba(20,42,56,.82)" strokeWidth="3.4" strokeLinecap="round">
-          <path d={`M${x - 21} ${y}c4.5 4 9 4 13.5 0M${x + 7.5} ${y}c4.5 4 9 4 13.5 0`} />
-        </g>
-      ) : (
-        <g>
-          <g fill="rgba(16,38,54,.92)">
-            <ellipse cx={x - 14.5} cy={y} rx="5.2" ry={worried ? 6 : 7.6} />
-            <ellipse cx={x + 14.5} cy={y} rx="5.2" ry={worried ? 6 : 7.6} />
-          </g>
-          <g fill="#ffffff">
-            <circle cx={x - 16.2} cy={y - 2.6} r="2.1" />
-            <circle cx={x + 12.8} cy={y - 2.6} r="2.1" />
-            <circle cx={x - 12.4} cy={y + 3.4} r="1.05" opacity=".85" />
-            <circle cx={x + 16.6} cy={y + 3.4} r="1.05" opacity=".85" />
-          </g>
-        </g>
-      )}
-      <path
-        d={worried ? `M${x - 6} ${y + 18}c4-4.5 8-4.5 12 0` : sleeping ? `M${x - 4} ${y + 16}h8` : `M${x - 7.5} ${y + 13}c4.5 7.5 10.5 7.5 15 0`}
-        fill="none"
-        stroke="rgba(18,40,55,.8)"
-        strokeWidth="3"
-        strokeLinecap="round"
-      />
-      {mood === "feliz" ? (
-        <g fill="rgba(255,117,157,.36)">
-          <ellipse cx={x - 27} cy={y + 11} rx="7.5" ry="3.4" />
-          <ellipse cx={x + 27} cy={y + 11} rx="7.5" ry="3.4" />
-        </g>
-      ) : null}
-      {mood === "peligro" ? <path d={`M${x + 31} ${y - 21}c0 9.5-10.5 9.5-10.5 0 0-5 5.25-11.5 5.25-11.5s5.25 6.5 5.25 11.5`} fill="rgba(113,205,255,.9)" /> : null}
-    </g>
-  );
-}
+import type { OwnedItem, Slot } from "@/lib/social/catalog";
+import { EVOLVED, type Paint } from "./PetEvolutions";
+import Face from "./PetFace";
+import { AncestralAura, ITEM_GRADIENTS, ItemDefs, ItemPiece, Spark as Sparkle, type ItemIds } from "./PetItems";
 
 type EggIds = { egg: string; accent: string };
 
@@ -711,6 +661,12 @@ const CLOUD_BODY_BY_STAGE: string[][] = [
   ["#e6ecf8", "#a9bada", "#6d7fa9"],
   ["#ccd7ee", "#8395bf", "#495880"],
   ["#b9c7e4", "#6174a0", "#2f3c60"],
+  ["#e8eef9", "#a4b4d8", "#5d6c9c"],
+  ["#e2eaf8", "#95a8d2", "#4f5f92"],
+  ["#ffffff", "#eef4ff", "#c4d2f0"],
+  ["#ffffff", "#f0f5ff", "#c9d6f2"],
+  ["#ffffff", "#f3f7ff", "#cfdaf4"],
+  ["#ffffff", "#eef6ff", "#cbd9f2"],
 ];
 
 /** Sin elemento todavía, el huevo es neutro: crema con motas suaves. */
@@ -733,6 +689,12 @@ const ANCHORS: Record<PetKind, Anchors[]> = {
     { cabeza: [80, 12, 0.95], cuello: [80, 112, 1], espalda: [80, 84, 1.2], cola: [120, 116, 1], mano: [134, 110, 0.9], suelo: [80, 144, 1.1] },
     { cabeza: [80, 6, 1], cuello: [80, 116, 1.05], espalda: [80, 84, 1.3], cola: [116, 122, 1.05], mano: [132, 112, 0.95], suelo: [80, 152, 1.15] },
     { cabeza: [80, 0, 1.05], cuello: [80, 118, 1.1], espalda: [80, 84, 1.4], cola: [118, 124, 1.1], mano: [136, 114, 1], suelo: [80, 158, 1.2] },
+    { cabeza: [80, 30, 0.9], cuello: [80, 100, 0.95], espalda: [80, 92, 1.0], cola: [106, 126, 1], mano: [114, 112, 0.9], suelo: [80, 150, 1.1] },
+    { cabeza: [80, 28, 0.9], cuello: [80, 100, 0.95], espalda: [80, 92, 1.05], cola: [106, 126, 1], mano: [114, 112, 0.9], suelo: [80, 150, 1.1] },
+    { cabeza: [80, 32, 0.9], cuello: [80, 88, 0.9], espalda: [80, 94, 1.0], cola: [104, 126, 1], mano: [110, 114, 0.85], suelo: [80, 152, 1.1] },
+    { cabeza: [80, 32, 0.9], cuello: [80, 88, 0.9], espalda: [80, 94, 1.05], cola: [104, 126, 1], mano: [110, 114, 0.85], suelo: [80, 152, 1.1] },
+    { cabeza: [80, 26, 0.9], cuello: [80, 88, 0.9], espalda: [80, 94, 1.1], cola: [104, 126, 1], mano: [110, 114, 0.85], suelo: [80, 152, 1.1] },
+    { cabeza: [80, 30, 0.9], cuello: [80, 116, 0.95], espalda: [80, 80, 1.15], cola: [124, 108, 1], mano: [126, 98, 0.9], suelo: [80, 150, 1.2] },
   ],
   agua: [
     { cabeza: [80, 40, 0.8], cuello: [80, 120, 0.85], espalda: [80, 94, 0.9], cola: [106, 116, 0.8], mano: [106, 112, 0.7], suelo: [80, 132, 0.9] },
@@ -741,6 +703,12 @@ const ANCHORS: Record<PetKind, Anchors[]> = {
     { cabeza: [80, 26, 0.95], cuello: [80, 116, 1], espalda: [80, 86, 1.2], cola: [120, 118, 1], mano: [136, 112, 0.9], suelo: [80, 148, 1.1] },
     { cabeza: [80, 14, 1], cuello: [80, 116, 1.05], espalda: [80, 86, 1.3], cola: [124, 120, 1.05], mano: [140, 112, 0.95], suelo: [80, 150, 1.15] },
     { cabeza: [80, 6, 1.05], cuello: [80, 118, 1.1], espalda: [80, 84, 1.4], cola: [128, 122, 1.1], mano: [144, 114, 1], suelo: [80, 152, 1.2] },
+    { cabeza: [80, 46, 0.9], cuello: [80, 106, 0.95], espalda: [80, 100, 1.0], cola: [104, 120, 1], mano: [112, 118, 0.85], suelo: [80, 148, 1.1] },
+    { cabeza: [80, 34, 0.9], cuello: [80, 106, 0.95], espalda: [80, 100, 1.05], cola: [104, 120, 1], mano: [112, 118, 0.85], suelo: [80, 148, 1.1] },
+    { cabeza: [80, 28, 0.9], cuello: [80, 84, 0.8], espalda: [80, 92, 1.0], cola: [140, 124, 0.9], mano: [122, 104, 0.8], suelo: [80, 140, 1.1] },
+    { cabeza: [80, 20, 0.9], cuello: [80, 84, 0.8], espalda: [80, 92, 1.05], cola: [140, 124, 0.9], mano: [122, 104, 0.8], suelo: [80, 140, 1.1] },
+    { cabeza: [80, 18, 0.9], cuello: [80, 84, 0.8], espalda: [80, 92, 1.1], cola: [140, 124, 0.9], mano: [122, 104, 0.8], suelo: [80, 140, 1.1] },
+    { cabeza: [80, 46, 1], cuello: [80, 122, 1], espalda: [80, 86, 1.15], cola: [138, 98, 1], mano: [138, 114, 0.9], suelo: [80, 152, 1.2] },
   ],
   bosque: [
     { cabeza: [80, 44, 0.8], cuello: [80, 124, 0.85], espalda: [80, 98, 0.9], cola: [108, 120, 0.8], mano: [108, 116, 0.7], suelo: [80, 138, 0.9] },
@@ -749,6 +717,12 @@ const ANCHORS: Record<PetKind, Anchors[]> = {
     { cabeza: [80, 4, 0.95], cuello: [80, 122, 1], espalda: [80, 92, 1.2], cola: [114, 126, 1], mano: [138, 116, 0.9], suelo: [80, 148, 1.1] },
     { cabeza: [80, 2, 1], cuello: [80, 122, 1.05], espalda: [80, 90, 1.3], cola: [118, 128, 1.05], mano: [140, 116, 0.95], suelo: [80, 150, 1.15] },
     { cabeza: [80, -2, 1.05], cuello: [80, 124, 1.1], espalda: [80, 90, 1.4], cola: [122, 130, 1.1], mano: [146, 118, 1], suelo: [80, 152, 1.2] },
+    { cabeza: [80, 46, 0.85], cuello: [80, 110, 0.9], espalda: [80, 116, 0.9], cola: [108, 118, 0.9], mano: [98, 132, 0.8], suelo: [80, 152, 1.1] },
+    { cabeza: [80, 46, 0.85], cuello: [80, 110, 0.9], espalda: [80, 116, 0.95], cola: [108, 118, 0.9], mano: [98, 132, 0.8], suelo: [80, 152, 1.1] },
+    { cabeza: [80, 93, 0.8], cuello: [80, 138, 0.7], espalda: [80, 96, 1.05], cola: [136, 122, 0.9], mano: [118, 132, 0.8], suelo: [80, 154, 1.2] },
+    { cabeza: [80, 93, 0.8], cuello: [80, 138, 0.7], espalda: [80, 96, 1.1], cola: [136, 122, 0.9], mano: [118, 132, 0.8], suelo: [80, 154, 1.2] },
+    { cabeza: [80, 93, 0.8], cuello: [80, 138, 0.7], espalda: [80, 96, 1.15], cola: [136, 122, 0.9], mano: [118, 132, 0.8], suelo: [80, 154, 1.2] },
+    { cabeza: [80, 42, 0.85], cuello: [80, 90, 0.8], espalda: [80, 86, 1.2], cola: [86, 128, 0.9], mano: [104, 106, 0.8], suelo: [80, 156, 1.1] },
   ],
   nube: [
     { cabeza: [80, 48, 0.8], cuello: [80, 108, 0.85], espalda: [80, 84, 1.1], cola: [118, 100, 0.8], mano: [118, 100, 0.7], suelo: [80, 128, 0.9] },
@@ -757,28 +731,33 @@ const ANCHORS: Record<PetKind, Anchors[]> = {
     { cabeza: [80, 28, 0.95], cuello: [80, 102, 1], espalda: [80, 76, 1.6], cola: [142, 100, 1], mano: [150, 90, 0.9], suelo: [80, 144, 1.1] },
     { cabeza: [80, 16, 1], cuello: [80, 100, 1.05], espalda: [80, 72, 1.7], cola: [140, 106, 1.05], mano: [150, 92, 0.95], suelo: [80, 148, 1.15] },
     { cabeza: [80, 12, 1.05], cuello: [80, 102, 1.1], espalda: [80, 70, 1.8], cola: [146, 110, 1.1], mano: [154, 92, 1], suelo: [80, 154, 1.2] },
+    { cabeza: [80, 44, 0.9], cuello: [80, 104, 0.95], espalda: [80, 96, 1.0], cola: [116, 126, 0.9], mano: [122, 112, 0.85], suelo: [80, 150, 1.1] },
+    { cabeza: [80, 44, 0.9], cuello: [80, 104, 0.95], espalda: [80, 96, 1.05], cola: [116, 126, 0.9], mano: [122, 112, 0.85], suelo: [80, 150, 1.1] },
+    { cabeza: [80, 30, 0.85], cuello: [80, 114, 0.95], espalda: [80, 104, 1.0], cola: [112, 120, 0.9], mano: [100, 136, 0.8], suelo: [80, 152, 1.1] },
+    { cabeza: [80, 30, 0.85], cuello: [80, 114, 0.95], espalda: [80, 104, 1.05], cola: [112, 120, 0.9], mano: [100, 136, 0.8], suelo: [80, 152, 1.1] },
+    { cabeza: [80, 30, 0.85], cuello: [80, 114, 0.95], espalda: [80, 104, 1.1], cola: [112, 120, 0.9], mano: [100, 136, 0.8], suelo: [80, 152, 1.1] },
+    { cabeza: [80, 100, 0.9], cuello: [80, 134, 0.8], espalda: [80, 84, 1.15], cola: [140, 56, 0.9], mano: [22, 60, 0.8], suelo: [80, 154, 1.1] },
   ],
 };
 
 const BACK_SLOTS: Slot[] = ["suelo", "espalda", "cola"];
 const FRONT_SLOTS: Slot[] = ["cuello", "cabeza", "mano"];
 
-function ItemLayer({ items, slots, anchors, ids }: { items: CatalogItem[]; slots: Slot[]; anchors: Anchors; ids: ItemIds }) {
+function ItemLayer({ items, slots, anchors, ids }: { items: OwnedItem[]; slots: Slot[]; anchors: Anchors; ids: ItemIds }) {
   return slots.map((slot) => {
     const item = items.find((candidate) => candidate.slot === slot);
-    const draw = item ? ITEM_DRAWINGS[item.id] : null;
-    if (!item || !draw) return null;
+    if (!item) return null;
     const [x, y, scale] = anchors[slot];
     return (
       <g key={slot} transform={`translate(${x} ${y}) scale(${scale})`}>
-        {draw(ids)}
+        <ItemPiece id={item.id} level={item.level} ids={ids} />
       </g>
     );
   });
 }
 
-/** La escala remata el salto: de cría diminuta a criatura desarrollada. */
-const STAGE_SCALE = [0.44, 0.58, 0.72, 0.86, 1, 1.1];
+/** La escala acompaña el crecimiento; las formas altas ya ocupan el marco y crecen por dibujo, no por tamaño. */
+const STAGE_SCALE = [0.44, 0.54, 0.64, 0.74, 0.84, 0.9, 0.94, 0.97, 0.96, 0.99, 1.02, 1.04];
 /** El huevo es algo mayor que la cría que sale de él. */
 const EGG_SCALE = 0.55;
 
@@ -796,10 +775,10 @@ export default function PetAvatar({
   kind: PetKind | null;
   stage: PetStage;
   mood: PetMood;
-  /** Fase del huevo mientras nace; una criatura caída se pinta siempre como criatura. */
+  /** Fase del huevo mientras nace. */
   eggPhase?: EggPhase | null;
-  /** Piezas puestas, una por hueco; el huevo no lleva nada. */
-  items?: CatalogItem[];
+  /** Piezas puestas, una por hueco y con su nivel; el huevo no lleva nada. */
+  items?: OwnedItem[];
   ancestral?: boolean;
   name: string;
   size?: "small" | "normal" | "large";
@@ -808,12 +787,13 @@ export default function PetAvatar({
   const ids = { body: `pet-body-${rawId}`, soft: `pet-soft-${rawId}`, accent: `pet-accent-${rawId}`, egg: `pet-egg-${rawId}` };
   const fills = { body: `url(#${ids.body})`, soft: `url(#${ids.soft})`, accent: `url(#${ids.accent})` };
   const itemIds = Object.fromEntries(ITEM_GRADIENTS.map((key) => [key, `pet-${key}-${rawId}`])) as ItemIds;
+  const paint = Object.fromEntries(ITEM_GRADIENTS.map((key) => [key, `url(#${itemIds[key]})`])) as Paint;
   const stageIndex = PET_STAGES.findIndex((item) => item.id === stage);
   const bodyKind = kind ?? "nube";
   const colors = colorsFor(kind, stageIndex);
   const inEgg = eggPhase !== null && eggPhase < 4 ? (eggPhase as 0 | 1 | 2 | 3) : null;
   const scale = inEgg !== null ? EGG_SCALE : STAGE_SCALE[stageIndex];
-  const Drawing = DRAWINGS[bodyKind];
+  const evolved = stageIndex >= 6;
   const anchors = ANCHORS[bodyKind][stageIndex];
   const worn = inEgg !== null ? [] : items;
   const label = inEgg !== null
@@ -827,7 +807,7 @@ export default function PetAvatar({
       <span className="pet-avatar-aura" aria-hidden="true" />
       <svg viewBox="0 0 160 160" aria-hidden="true">
         <defs>
-          {worn.length > 0 || ancestral ? <ItemDefs ids={itemIds} /> : null}
+          {worn.length > 0 || ancestral || evolved ? <ItemDefs ids={itemIds} /> : null}
           <radialGradient id={ids.body} cx="35%" cy="25%" r="82%">
             <stop offset="0%" stopColor={colors.body[0]} />
             <stop offset="58%" stopColor={colors.body[1]} />
@@ -856,7 +836,9 @@ export default function PetAvatar({
             <>
               <ItemLayer items={worn} slots={BACK_SLOTS} anchors={anchors} ids={itemIds} />
               {eggPhase === 4 ? <HatchShells ids={ids} /> : null}
-              <Drawing stageIndex={stageIndex} mood={mood} fills={fills} />
+              {evolved
+                ? EVOLVED[bodyKind]({ tier: stageIndex - 6, mood, fills, paint })
+                : DRAWINGS[bodyKind]({ stageIndex, mood, fills })}
               <ItemLayer items={worn} slots={FRONT_SLOTS} anchors={anchors} ids={itemIds} />
             </>
           )}

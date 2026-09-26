@@ -1,5 +1,4 @@
 import { toDayString } from "@/lib/dates";
-import { STREAK_RECOVERY_MINUTES } from "@/lib/streak";
 import { addTimerSessionWithRecovery } from "@/lib/storage/repository";
 import {
   clearActiveTimer,
@@ -13,7 +12,7 @@ export async function saveCompletedTimer(timer: ActiveTimerSession, finishedAt: 
   const day = toDayString(new Date(settledAt));
 
   markActiveTimerCompleted(timer.id, settledAt);
-  await addTimerSessionWithRecovery(day, timer.minutes, settledAt, timer.id, STREAK_RECOVERY_MINUTES);
+  await addTimerSessionWithRecovery(day, timer.minutes, settledAt, timer.id);
 
   if (!clearActiveTimer(timer.id)) {
     throw new Error("No se pudo limpiar el cronómetro completado.");

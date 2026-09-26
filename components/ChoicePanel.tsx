@@ -5,13 +5,18 @@ import ItemIcon from "./ItemIcon";
 import PetAvatar from "./PetAvatar";
 import { confirmChoice, proposeChoice, type PetCard } from "@/lib/cloud/social";
 import { PET_DETAILS, PET_KINDS, type PetKind } from "@/lib/social/domain";
-import { catalogItem, isIdentity, itemsForPick, type ChoicePayload } from "@/lib/social/catalog";
+import { MAX_ITEM_LEVEL, catalogItem, isIdentity, itemName, itemsForPick, type ChoicePayload, type ItemLevel, type OwnedItem } from "@/lib/social/catalog";
 
 const PICK_LABELS = { identidad: "Nombre y elemento", objeto: "Un objeto zen", rasgo: "Un rasgo elemental", libre: "Lo que queráis" } as const;
 
-function describePayload(payload: ChoicePayload) {
+/** Una pieza propuesta se describe con el nivel al que llegaría si la otra persona la acepta. */
+function describePayload(payload: ChoicePayload, owned: OwnedItem[]) {
   if (isIdentity(payload)) return `${payload.name} · ${PET_DETAILS[payload.element].title}`;
-  if ("item" in payload && payload.item) return catalogItem(payload.item)?.label ?? payload.item;
+  const item = "item" in payload && payload.item ? catalogItem(payload.item) : undefined;
+  if (item) {
+    const level = Math.min(MAX_ITEM_LEVEL, (owned.find((own) => own.id === item.id)?.level ?? 0) + 1) as ItemLevel;
+    return itemName({ ...item, level });
+  }
   if ("order" in payload) return `Pedido: “${payload.order}”`;
   return "";
 }
@@ -56,7 +61,7 @@ export default function ChoicePanel({ card, onChanged }: { card: PetCard; onChan
             {row && !open ? (
               <div className="mt-2">
                 <p className="text-sm">
-                  <strong>{mine ? "Has propuesto" : `${card.friend.display_name} propone`}:</strong> {describePayload(row.payload)}
+                  <strong>{mine ? "Has propuesto" : `${card.friend.display_name} propone`}:</strong> {describePayload(row.payload, card.owned)}
                 </p>
                 <div className="flex gap-2 mt-2">
                   {mine ? (
@@ -82,7 +87,7 @@ export default function ChoicePanel({ card, onChanged }: { card: PetCard; onChan
             {open ? (
               milestone.pick === "identidad"
                 ? <IdentityForm busy={busy} onSubmit={propose} onCancel={cancel} />
-                : <ItemPicker pick={milestone.pick} busy={busy} onSubmit={propose} onCancel={cancel} />
+                : <ItemPicker pick={milestone.pick} owned={card.owned} busy={busy} onSubmit={propose} onCancel={cancel} />
             ) : null}
           </div>
         );
@@ -130,10 +135,10 @@ function IdentityForm({ busy, onSubmit, onCancel }: { busy: boolean; onSubmit: (
   );
 }
 
-function ItemPicker({ pick, busy, onSubmit, onCancel }: { pick: "objeto" | "rasgo" | "libre"; busy: boolean; onSubmit: (payload: ChoicePayload) => void; onCancel?: () => void }) {
+function ItemPicker({ pick, owned, busy, onSubmit, onCancel }: { pick: "objeto" | "rasgo" | "libre"; owned: OwnedItem[]; busy: boolean; onSubmit: (payload: ChoicePayload) => void; onCancel?: () => void }) {
   const [selected, setSelected] = useState<string | null>(null);
   const [order, setOrder] = useState("");
-  const items = itemsForPick(pick);
+  const items = itemsForPick(pick, owned);
 
   return (
     <div className="grid gap-3 mt-2">
@@ -148,7 +153,7 @@ function ItemPicker({ pick, busy, onSubmit, onCancel }: { pick: "objeto" | "rasg
             onClick={() => { setSelected(item.id); setOrder(""); }}
           >
             <ItemIcon item={item} />
-            <span>{item.label}</span>
+            <span>{itemName(item)}</span>
           </button>
         ))}
       </div>

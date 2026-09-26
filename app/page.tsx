@@ -394,13 +394,13 @@ export default function HomePage() {
 
           <PetShelf celebrate={celebratePets} onCelebrationClose={() => setCelebratePets(false)} />
 
-          {hydrated && streakRecovery?.available ? (
+          {hydrated && streakRecovery ? (
             <div className="recovery-panel p-3">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <div className="text-xs muted">Racha recuperable</div>
                   <div className="glass-title text-base font-semibold mt-1">
-                    Recupera la racha con 30 min.
+                    Recupera la racha con {streakRecovery.minutes} min.
                   </div>
                 </div>
                 <button

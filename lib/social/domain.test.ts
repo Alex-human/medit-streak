@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { addDays } from "../dates";
-import { choiceMilestones, computePetLife, petStageForBond, type SocialSession } from "./domain";
-import { dueChoices, equippedItems, identityOf, ownedItems, pendingOrders, wornOn, type ChoiceRow } from "./catalog";
+import { ANCESTRAL_DAY, EGG_DAYS, PET_STAGES, choiceMilestones, computePetLife, petStageForBond, type SocialSession } from "./domain";
+import { dueChoices, equippedItems, identityOf, itemsForPick, ownedItems, pendingOrders, wornOn, type ChoiceRow } from "./catalog";
 
 const owners: [string, string] = ["alex", "amiga"];
 /** Día n del calendario de pruebas: D(1) = 2026-01-01. */
@@ -11,18 +11,20 @@ function session(userId: string, day: string, minutes = 10, source: SocialSessio
   return { userId, day, minutes, source };
 }
 
-/** Los dos meditan 10 min cada día de 1 a `days`, salvo los días que cada uno falla. */
+/** Los dos apuntan 10 min a mano cada día de 1 a `days`, salvo los días que cada uno falla: solo el cronómetro rescata. */
 function daily(days: number, skip: { alex?: number[]; amiga?: number[] } = {}) {
   const sessions: SocialSession[] = [];
   for (let n = 1; n <= days; n += 1) {
-    if (!skip.alex?.includes(n)) sessions.push(session("alex", D(n)));
-    if (!skip.amiga?.includes(n)) sessions.push(session("amiga", D(n)));
+    if (!skip.alex?.includes(n)) sessions.push(session("alex", D(n), 10, "manual"));
+    if (!skip.amiga?.includes(n)) sessions.push(session("amiga", D(n), 10, "manual"));
   }
   return sessions;
 }
 
+/** Como en la app, el cálculo solo ve las sesiones hasta hoy. */
 function life(sessions: SocialSession[], today: number, identityDay: number | null = 4) {
-  return computePetLife({ sessions, ownerIds: owners, startDay: D(1), identityDay: identityDay === null ? null : D(identityDay), todayDay: D(today) });
+  const known = sessions.filter((item) => item.day <= D(today));
+  return computePetLife({ sessions: known, ownerIds: owners, startDay: D(1), identityDay: identityDay === null ? null : D(identityDay), todayDay: D(today) });
 }
 
 describe("egg", () => {
@@ -48,117 +50,109 @@ describe("egg", () => {
     ]);
   });
 
-  it("cannot die: missed days only delay the hatching", () => {
+  it("cannot go back while it is an egg: missed days only delay the hatching", () => {
     const sessions = daily(20, { alex: [2, 3] });
     expect(life(sessions, 6)).toMatchObject({ phase: "egg", bondDays: 4 });
     expect(life(sessions, 7)).toMatchObject({ phase: "alive", hatchDay: D(7), bondDays: 5 });
-    expect(life(sessions, 15)).toMatchObject({ phase: "alive", mood: "feliz", bondDays: 13, alerts: [] });
+    expect(life(sessions, 15)).toMatchObject({ phase: "alive", life: 1, mood: "feliz", bondDays: 13, alerts: [] });
+  });
+
+  it("counts a missed egg day once the owner rescues it with the timer", () => {
+    const sessions = [...daily(20, { alex: [2] }), session("alex", D(3), 10)];
+    expect(life(sessions, 5)).toMatchObject({ phase: "alive", bondDays: 5 });
+  });
+
+  it("hatches on the day the fifth bond day is known, never backwards", () => {
+    const sessions = [...daily(20, { alex: [5], amiga: [6] }), session("alex", D(7), 15)];
+    expect(life(sessions, 6)).toMatchObject({ phase: "egg", bondDays: 4 });
+    expect(life(sessions, 7)).toMatchObject({ phase: "alive", hatchDay: D(7), eggPhase: 4, bondDays: 6, alerts: [] });
   });
 });
 
-describe("danger", () => {
-  it("offers the 30 minute streak recovery the next day", () => {
-    const missed = life(daily(20, { alex: [8] }), 9);
-    expect(missed).toMatchObject({ mood: "recuperable", alerts: [{ userId: "alex", minutes: 30, daysLeft: 0 }] });
+describe("rescue ladder", () => {
+  const missed = daily(60, { alex: [8] });
 
-    const saved = life([...daily(20, { alex: [8, 9] }), session("alex", D(9), 30)], 9);
-    expect(saved).toMatchObject({ mood: "feliz", bondDays: 9, alerts: [] });
+  it("asks 10, 15, 20 and 30 minutes on the four days after the missed day, then goes back to the egg", () => {
+    expect(life(missed, 9)).toMatchObject({ mood: "recuperable", alerts: [{ userId: "alex", minutes: 10, daysLeft: 3 }] });
+    expect(life(missed, 10)).toMatchObject({ mood: "peligro", alerts: [{ userId: "alex", minutes: 15, daysLeft: 2 }] });
+    expect(life(missed, 11).alerts).toEqual([{ userId: "alex", minutes: 20, daysLeft: 1 }]);
+    expect(life(missed, 12).alerts).toEqual([{ userId: "alex", minutes: 30, daysLeft: 0 }]);
+    expect(life(missed, 13)).toMatchObject({ phase: "egg", life: 2, bornDay: D(13), bondDays: 1, eggPhase: 0, identityDue: false, alerts: [] });
+    expect(life(missed, 17)).toMatchObject({ phase: "alive", life: 2, hatchDay: D(17), eggPhase: 4, stage: "bebe" });
   });
 
-  it("enters danger for five days and one 60 minute session of the owner rescues the pet", () => {
-    const danger = life(daily(20, { alex: [8] }), 10);
-    expect(danger).toMatchObject({ mood: "peligro", alerts: [{ userId: "alex", minutes: 60, daysLeft: 4 }] });
-    expect(life(daily(20, { alex: [8] }), 14).alerts[0].daysLeft).toBe(0);
-
-    const rescued = life([...daily(20, { alex: [8, 10] }), session("alex", D(10), 60)], 10);
-    expect(rescued).toMatchObject({ mood: "feliz", bondDays: 10, alerts: [] });
-
-    const friendCannot = life([...daily(20, { alex: [8], amiga: [10] }), session("amiga", D(10), 60)], 10);
-    expect(friendCannot.mood).toBe("peligro");
+  it("rescues with that day's minutes and the missed day counts for the bond", () => {
+    expect(life([...missed, session("alex", D(9), 10)], 9)).toMatchObject({ mood: "feliz", bondDays: 9, alerts: [] });
+    expect(life([...missed, session("alex", D(11), 15)], 11).alerts).toEqual([{ userId: "alex", minutes: 20, daysLeft: 1 }]);
+    expect(life([...missed, session("alex", D(11), 20)], 20)).toMatchObject({ phase: "alive", life: 1, bondDays: 20, alerts: [] });
+    expect(life([...missed, session("alex", D(12), 30)], 13)).toMatchObject({ phase: "alive", life: 1, bondDays: 13 });
   });
 
-  it("rescues one incident per 60 minute day, so two missed days keep the pet in danger", () => {
-    const sessions = [...daily(20, { alex: [8, 9] }), session("alex", D(11), 60)];
-    expect(life(sessions, 11)).toMatchObject({ mood: "peligro", alerts: [{ userId: "alex", minutes: 60, daysLeft: 4 }], bondDays: 10 });
-    expect(life(sessions, 16).phase).toBe("fallen");
+  it("only counts the timer minutes of the owner who missed", () => {
+    expect(life([...missed, session("amiga", D(9), 30)], 9).alerts).toEqual([{ userId: "alex", minutes: 10, daysLeft: 3 }]);
+    expect(life([...missed, session("alex", D(9), 30, "manual")], 9).alerts).toEqual([{ userId: "alex", minutes: 10, daysLeft: 3 }]);
   });
 
-  it("opens the danger once when both owners miss the same day, and the pet falls once", () => {
-    const sessions = daily(40, { alex: [8], amiga: [8] });
-    expect(life(sessions, 10).mood).toBe("peligro");
-    expect(life(sessions, 15)).toMatchObject({ phase: "fallen", life: 1, diedDay: D(15) });
-    expect(life(sessions, 19)).toMatchObject({ phase: "egg", life: 2, bornDay: D(19) });
-    expect(life(sessions, 23)).toMatchObject({ phase: "alive", life: 2, hatchDay: D(23) });
-  });
-});
-
-describe("alerts per person", () => {
-  it("names each owner with their own pending minutes", () => {
-    const both = life(daily(40, { alex: [8], amiga: [8] }), 10);
-    expect(both.alerts).toEqual([{ userId: "alex", minutes: 60, daysLeft: 4 }, { userId: "amiga", minutes: 60, daysLeft: 4 }]);
-
-    const mixed = life(daily(40, { alex: [8], amiga: [9] }), 10);
-    expect(mixed).toMatchObject({ mood: "peligro", alerts: [{ userId: "alex", minutes: 60, daysLeft: 4 }, { userId: "amiga", minutes: 30, daysLeft: 0 }] });
-  });
-});
-
-describe("death, revival and rebirth", () => {
-  const sessions = daily(40, { alex: [8] });
-
-  it("falls after the deadline and comes back as an egg four days later with the same identity", () => {
-    expect(life(sessions, 15)).toMatchObject({ phase: "fallen", mood: "fallecida", diedDay: D(15), rebirthInDays: 4, stage: "cria", milestones: [] });
-    expect(life(sessions, 18).rebirthInDays).toBe(1);
-    expect(life(sessions, 19)).toMatchObject({ phase: "egg", life: 2, bornDay: D(19), bondDays: 1, eggPhase: 0, identityDue: false });
-    expect(life(sessions, 23)).toMatchObject({ phase: "alive", life: 2, hatchDay: D(23), eggPhase: 4, bondDays: 5 });
-    expect(life(sessions, 23).history).toEqual([
-      { life: 1, stage: "bebe", day: D(5) },
-      { life: 1, stage: "cria", day: D(13) },
-      { life: 2, stage: "bebe", day: D(23) },
-    ]);
+  it("lets one session cover several missed days in a row", () => {
+    const twice = daily(60, { alex: [8, 9] });
+    expect(life([...twice, session("alex", D(10), 15)], 10)).toMatchObject({ mood: "feliz", bondDays: 10, alerts: [] });
+    expect(life([...twice, session("alex", D(10), 10)], 10).alerts).toEqual([{ userId: "alex", minutes: 15, daysLeft: 2 }]);
   });
 
-  it("keeps the bond when 60 minutes of anyone arrive inside the four day window", () => {
-    const revived = life([...sessions, session("amiga", D(17), 60)], 20);
-    expect(revived).toMatchObject({ phase: "alive", life: 1, hatchDay: D(5), bondDays: 19, stage: "cria", mood: "feliz" });
-    expect(life([...sessions, session("alex", D(18), 60)], 18).phase).toBe("alive");
-    expect(life([...sessions, session("alex", D(19), 60)], 19)).toMatchObject({ phase: "egg", life: 2 });
+  it("gives each owner their own minutes and goes back to the egg once when both miss", () => {
+    expect(life(daily(60, { alex: [8], amiga: [9] }), 10)).toMatchObject({
+      mood: "peligro",
+      alerts: [{ userId: "alex", minutes: 15, daysLeft: 2 }, { userId: "amiga", minutes: 10, daysLeft: 3 }],
+    });
+    const both = daily(60, { alex: [8], amiga: [8] });
+    expect(life(both, 10).alerts).toEqual([{ userId: "alex", minutes: 15, daysLeft: 2 }, { userId: "amiga", minutes: 15, daysLeft: 2 }]);
+    expect(life(both, 13)).toMatchObject({ phase: "egg", life: 2 });
+    expect(life(both, 20)).toMatchObject({ phase: "alive", life: 2 });
   });
 
-  it("comes back the same day it falls with 60 minutes of either owner", () => {
-    expect(life([...sessions, session("amiga", D(15), 60)], 15)).toMatchObject({ phase: "alive", life: 1, diedDay: null, mood: "feliz" });
-    expect(life([...sessions, session("alex", D(15), 60)], 15)).toMatchObject({ phase: "alive", life: 1, diedDay: null });
+  it("does not open new dangers for days missed while it is an egg again", () => {
+    const sessions = daily(60, { alex: [8, 14, 15] });
+    expect(life(sessions, 13)).toMatchObject({ phase: "egg", life: 2 });
+    expect(life(sessions, 20)).toMatchObject({ phase: "alive", life: 2, hatchDay: D(19), bondDays: 6, alerts: [] });
   });
 
-  it("does not open new dangers for days missed while fallen", () => {
-    const back = [...daily(40, { alex: [8, 16, 17] }), session("alex", D(18), 60)];
-    expect(life(back, 19)).toMatchObject({ phase: "alive", mood: "feliz", alerts: [] });
-  });
-
-  it("keeps the ancestral aura through a rebirth", () => {
-    const year = daily(370);
-    expect(life(year, 370)).toMatchObject({ ancestral: true, stage: "guardiana" });
-    expect(life(year, 370).milestones.at(-1)).toEqual({ day: 365, pick: "libre" });
-    expect(life(year, 377).mood).toBe("peligro");
-    expect(life(year, 378).phase).toBe("fallen");
-    expect(life(year, 382)).toMatchObject({ phase: "egg", life: 2, ancestral: true });
+  it("keeps the ancestral aura after going back to the egg", () => {
+    const year = daily(380, { alex: [375] });
+    expect(life(year, 370)).toMatchObject({ ancestral: true, stage: "eterna" });
+    expect(life(year, 380)).toMatchObject({ phase: "egg", life: 2, ancestral: true });
   });
 });
 
 describe("stages and milestones", () => {
-  it("uses the six body thresholds", () => {
-    expect(petStageForBond(0)).toBe("bebe");
+  it("uses the twelve body thresholds", () => {
+    expect(PET_STAGES.map((stage) => petStageForBond(stage.minBondDays))).toEqual(PET_STAGES.map((stage) => stage.id));
     expect(petStageForBond(11)).toBe("bebe");
-    expect(petStageForBond(12)).toBe("cria");
-    expect(petStageForBond(25)).toBe("joven");
-    expect(petStageForBond(45)).toBe("adulta");
-    expect(petStageForBond(90)).toBe("radiante");
-    expect(petStageForBond(180)).toBe("guardiana");
+    expect(petStageForBond(304)).toBe("celestial");
+    expect(petStageForBond(1000)).toBe("eterna");
   });
 
-  it("is dense in the first month and every 60 days after the first year", () => {
+  it("keeps the dense first month and cycles the picks", () => {
     expect(choiceMilestones(7)).toEqual([]);
-    expect(choiceMilestones(30).map((milestone) => milestone.day)).toEqual([8, 16, 20, 30]);
-    expect(choiceMilestones(485).map((milestone) => milestone.day).slice(-3)).toEqual([365, 425, 485]);
+    expect(choiceMilestones(30)).toEqual([
+      { day: 8, pick: "objeto" },
+      { day: 16, pick: "objeto" },
+      { day: 20, pick: "rasgo" },
+      { day: 30, pick: "libre" },
+    ]);
+    expect(choiceMilestones(400).map((milestone) => milestone.day).filter((day) => day > ANCESTRAL_DAY)).toEqual([370, 381, 389, 394]);
+  });
+
+  it("changes something every 3 to 13 days, 8 on average after the first month", () => {
+    const events = [EGG_DAYS, ...PET_STAGES.slice(1).map((stage) => stage.minBondDays), ...choiceMilestones(ANCESTRAL_DAY).map((milestone) => milestone.day), ANCESTRAL_DAY]
+      .sort((left, right) => left - right);
+    expect(new Set(events).size).toBe(events.length);
+    const gaps = events.slice(1).map((day, index) => day - events[index]);
+    expect(Math.min(...gaps)).toBeGreaterThanOrEqual(3);
+    expect(Math.max(...gaps)).toBeLessThanOrEqual(13);
+    const later = events.filter((day) => day >= 30);
+    const average = (later[later.length - 1] - later[0]) / (later.length - 1);
+    expect(average).toBeGreaterThan(7.5);
+    expect(average).toBeLessThan(8.5);
   });
 });
 
@@ -176,7 +170,7 @@ describe("shared choices", () => {
     ...overrides,
   });
 
-  it("reads the agreed identity and the owned items from confirmed rows only", () => {
+  it("reads the agreed identity and the owned items with their level from confirmed rows only", () => {
     const choices = [
       row({ milestone_day: 5, payload: { name: "Brasa", element: "fuego" } }),
       row({ milestone_day: 8 }),
@@ -184,22 +178,36 @@ describe("shared choices", () => {
       row({ milestone_day: 20, payload: { item: "no-existe" } }),
       row({ milestone_day: 30, payload: { order: "collar de dragón", item: "cola-llama" } }),
       row({ milestone_day: 38, payload: { order: "capa de estrellas" } }),
+      row({ milestone_day: 46, confirmed_at: "2026-02-15T11:00:00Z" }),
     ];
     expect(identityOf(choices)?.identity).toEqual({ name: "Brasa", element: "fuego" });
-    expect(ownedItems(choices).map((item) => item.id)).toEqual(["mala", "cola-llama"]);
+    expect(ownedItems(choices).map((item) => [item.id, item.level])).toEqual([["mala", 2], ["cola-llama", 1]]);
     expect(pendingOrders(choices)).toHaveLength(1);
     expect(equippedItems({ cuello: "mala", cola: "estela-viento" }, ownedItems(choices)).map((item) => item.id)).toEqual(["mala"]);
   });
 
-  it("dresses the album with the last piece confirmed in each slot up to that day", () => {
+  it("offers each piece at the level it would reach and hides the celestial ones", () => {
+    const owned = ownedItems([row({ id: "a" }), row({ id: "b" }), row({ id: "c" }), row({ id: "d", payload: { item: "halo" } })]);
+    const offer = itemsForPick("objeto", owned);
+    expect(offer.find((item) => item.id === "mala")).toBeUndefined();
+    expect(offer.find((item) => item.id === "halo")?.level).toBe(2);
+    expect(offer.find((item) => item.id === "zafu")?.level).toBe(1);
+    expect(offer.every((item) => item.kind === "objeto")).toBe(true);
+    expect(itemsForPick("libre", owned).some((item) => item.kind === "rasgo")).toBe(true);
+  });
+
+  it("dresses the album with the last piece confirmed in each slot up to that day, at its level then", () => {
     const choices = [
-      row({ id: "halo", milestone_day: 8, payload: { item: "halo" }, proposed_at: "2026-01-08T10:00:00Z", confirmed_at: "2026-01-20T10:00:00Z" }),
-      row({ id: "loto", milestone_day: 16, payload: { item: "loto" }, proposed_at: "2026-01-16T10:00:00Z", confirmed_at: "2026-01-16T11:00:00Z" }),
-      row({ id: "mala", milestone_day: 30, payload: { item: "mala" }, proposed_at: "2026-01-30T10:00:00Z", confirmed_by: null, confirmed_at: null }),
+      row({ milestone_day: 8, payload: { item: "halo" }, proposed_at: "2026-01-08T10:00:00Z", confirmed_at: "2026-01-20T10:00:00Z" }),
+      row({ milestone_day: 16, payload: { item: "loto" }, proposed_at: "2026-01-16T10:00:00Z", confirmed_at: "2026-01-16T11:00:00Z" }),
+      row({ milestone_day: 20, payload: { item: "loto" }, proposed_at: "2026-01-21T10:00:00Z", confirmed_at: "2026-01-30T11:00:00Z" }),
+      row({ milestone_day: 30, payload: { item: "gorro" }, confirmed_at: null, confirmed_by: null }),
     ];
-    expect(wornOn(choices, "2026-01-10")).toEqual([]);
-    expect(wornOn(choices, "2026-01-18").map((item) => item.id)).toEqual(["loto"]);
-    expect(wornOn(choices, "2026-01-25").map((item) => item.id)).toEqual(["halo"]);
+    const worn = (day: string) => wornOn(choices, day).map((item) => [item.id, item.level]);
+    expect(worn("2026-01-10")).toEqual([]);
+    expect(worn("2026-01-18")).toEqual([["loto", 1]]);
+    expect(worn("2026-01-25")).toEqual([["halo", 1]]);
+    expect(worn("2026-02-05")).toEqual([["loto", 2]]);
   });
 
   it("opens the identity, keeps proposals pending and repeats milestones in each life", () => {
@@ -210,7 +218,7 @@ describe("shared choices", () => {
     const choices = [row({ milestone_day: 8 }), row({ milestone_day: 16, payload: { item: "halo" }, confirmed_by: null, confirmed_at: null })];
     expect(dueChoices(grown, choices)).toEqual([{ milestone: { day: 16, pick: "objeto" }, row: choices[1] }]);
 
-    const secondLife = life(daily(40, { alex: [8] }), 26);
+    const secondLife = life(daily(40, { alex: [8] }), 20);
     expect(secondLife).toMatchObject({ life: 2, bondDays: 8 });
     expect(dueChoices(secondLife, choices)).toEqual([{ milestone: { day: 8, pick: "objeto" }, row: null }]);
   });

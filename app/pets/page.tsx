@@ -10,7 +10,7 @@ import PetCreatureCard, { petName } from "@/components/PetCreatureCard";
 import TimeBackground from "@/components/TimeBackground";
 import { loadSocialSnapshot, wearItem, type PetCard } from "@/lib/cloud/social";
 import { PET_STAGES } from "@/lib/social/domain";
-import { pendingOrders, SLOTS, wornOn, type Slot } from "@/lib/social/catalog";
+import { itemName, pendingOrders, SLOTS, wornOn, type Slot } from "@/lib/social/catalog";
 import { splitReveal } from "@/lib/social/reveal";
 
 export default function PetsPage() {
@@ -122,7 +122,7 @@ function PetSheet({ card, onChanged }: { card: PetCard; onChanged: () => Promise
                       return (
                         <button key={item.id} type="button" disabled={busy} aria-pressed={worn} className={`pet-item-tile ${worn ? "is-active" : ""}`} onClick={() => void wear(slot, worn ? null : item.id)}>
                           <ItemIcon item={item} />
-                          <span>{item.label}</span>
+                          <span>{itemName(item)}</span>
                           <small>{worn ? "Puesta" : "Guardada"}</small>
                         </button>
                       );

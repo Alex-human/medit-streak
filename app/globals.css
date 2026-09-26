@@ -615,8 +615,6 @@ html[data-time-phase="night"] {
 .pet-avatar-feliz { animation: petHappy 1.8s ease-in-out infinite; }
 .pet-avatar-esperando, .pet-avatar-dormida { animation: petBreathe 3.4s ease-in-out infinite; }
 .pet-avatar-peligro { animation: petWorry .8s ease-in-out infinite alternate; }
-.pet-avatar-fallecida { opacity: .56; filter: grayscale(.82) drop-shadow(0 7px 10px rgba(15,44,68,.12)); }
-.pet-avatar-fallecida .pet-avatar-aura { opacity: .08; }
 .pet-tail { transform-origin: 118px 100px; animation: tailWave 1.8s ease-in-out infinite; }
 .pet-sprout { transform-origin: 80px 57px; animation: sproutSway 2.6s ease-in-out infinite; }
 .pet-wings { transform-origin: 80px 84px; animation: wingFlutter 2.2s ease-in-out infinite; }
@@ -624,6 +622,10 @@ html[data-time-phase="night"] {
 .pet-egg-hatching { animation: eggShake 1.3s ease-in-out infinite; }
 .pet-avatar-egg .pet-avatar-aura { opacity: .3; }
 .pet-aura-ancestral { transform-origin: 80px 80px; animation: auraTurn 24s linear infinite; }
+.pet-orbit { transform-origin: 80px 80px; animation: auraTurn 18s linear infinite; }
+.pet-orbit-soft { transform-origin: 80px 30px; animation: petBreathe 4s ease-in-out infinite; }
+.pet-sun-rays { transform-origin: 80px 80px; animation: auraTurn 40s linear infinite; }
+.pet-moth-wings { transform-origin: 80px 84px; animation: mothWings 3s ease-in-out infinite; }
 
 /* ---------- Mascotas ---------- */
 .pet-empty { display: flex; align-items: center; justify-content: space-between; gap: .6rem; }
@@ -636,7 +638,6 @@ html[data-time-phase="night"] {
 .pet-creature-bosque { --pet-tint-a: rgba(178,231,130,.34); --pet-tint-b: rgba(103,151,86,.12); }
 .pet-creature-nube { --pet-tint-a: rgba(226,240,255,.38); --pet-tint-b: rgba(183,151,246,.14); }
 .pet-creature-huevo { --pet-tint-a: rgba(255,236,200,.36); --pet-tint-b: rgba(214,196,255,.14); }
-.pet-creature.is-fallen { --pet-tint-a: rgba(126,138,155,.22); --pet-tint-b: rgba(92,102,118,.1); }
 .pet-creature-stage { display: grid; place-items: center; }
 .pet-creature-foot { margin-top: 0.15rem; }
 
@@ -669,6 +670,7 @@ html[data-time-phase="night"] {
 @keyframes wingFlutter { 0%, 100% { transform: scaleX(1) rotate(0); } 50% { transform: scaleX(.94) rotate(-1deg); } }
 @keyframes eggWobble { 0%, 100% { transform: rotate(-3deg); } 50% { transform: rotate(3deg); } }
 @keyframes auraTurn { to { transform: rotate(360deg); } }
+@keyframes mothWings { 0%, 100% { transform: scaleX(1); } 50% { transform: scaleX(.9); } }
 @keyframes eggShake { 0%, 55%, 100% { transform: rotate(0); } 10% { transform: rotate(-6deg); } 20% { transform: rotate(5deg); } 30% { transform: rotate(-4deg); } 40% { transform: rotate(3deg); } }
 @keyframes shelfShimmer { to { background-position-x: -220%; } }
 
@@ -719,6 +721,10 @@ html[data-time-phase="night"] {
   .pet-wings,
   .pet-egg,
   .pet-aura-ancestral,
+  .pet-orbit,
+  .pet-orbit-soft,
+  .pet-sun-rays,
+  .pet-moth-wings,
   .auth-creature,
   .pet-shelf-loading {
     animation: none !important;

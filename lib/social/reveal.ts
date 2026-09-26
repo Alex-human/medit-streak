@@ -1,5 +1,5 @@
 import type { PetCard } from "../cloud/social";
-import { equippedItems, type CatalogItem } from "./catalog";
+import { equippedItems, type OwnedItem } from "./catalog";
 
 /**
  * Estreno: cada persona ve una pieza nueva sobre la mascota por primera vez en la
@@ -13,7 +13,8 @@ function key(userId: string, petId: string) {
 function readSeenItems(userId: string, petId: string): Set<string> | null {
   try {
     const raw = window.localStorage.getItem(key(userId, petId));
-    return new Set(raw ? (JSON.parse(raw) as string[]) : []);
+    // Lo visto antes de que existieran los niveles se guardó sin nivel: era el nivel 1.
+    return new Set((raw ? (JSON.parse(raw) as string[]) : []).map((entry) => (entry.includes(":") ? entry : `${entry}:1`)));
   } catch {
     return null;
   }
@@ -27,16 +28,19 @@ function writeSeenItems(userId: string, petId: string, itemIds: Iterable<string>
   }
 }
 
+/** Una pieza que sube de nivel se estrena otra vez: lo visto se recuerda por pieza y nivel. */
+const seenKey = (item: OwnedItem) => `${item.id}:${item.level}`;
+
 /** Separa lo que esta persona ya ha estrenado de lo que verá en su próxima celebración. */
-export function splitReveal(card: PetCard): { shown: CatalogItem[]; fresh: CatalogItem[] } {
+export function splitReveal(card: PetCard): { shown: OwnedItem[]; fresh: OwnedItem[] } {
   const equipped = equippedItems(card.pet.outfit, card.owned);
   const seen = readSeenItems(card.currentUserId, card.pet.id);
   if (seen === null) return { shown: equipped, fresh: [] };
-  return { shown: equipped.filter((item) => seen.has(item.id)), fresh: equipped.filter((item) => !seen.has(item.id)) };
+  return { shown: equipped.filter((item) => seen.has(seenKey(item))), fresh: equipped.filter((item) => !seen.has(seenKey(item))) };
 }
 
 export function markRevealed(card: PetCard) {
   const seen = readSeenItems(card.currentUserId, card.pet.id) ?? new Set<string>();
-  for (const item of equippedItems(card.pet.outfit, card.owned)) seen.add(item.id);
+  for (const item of equippedItems(card.pet.outfit, card.owned)) seen.add(seenKey(item));
   writeSeenItems(card.currentUserId, card.pet.id, seen);
 }

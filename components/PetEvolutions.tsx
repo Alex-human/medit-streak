@@ -63,6 +63,17 @@ function Fireflies({ points }: { points: [number, number][] }) {
   );
 }
 
+/** Garras blancas en abanico para manos y pies. */
+function Claws({ x, y, spread = 5, length = 4, angle = 0 }: { x: number; y: number; spread?: number; length?: number; angle?: number }) {
+  return (
+    <g transform={`rotate(${angle} ${x} ${y})`}>
+      {[-spread, 0, spread].map((dx) => (
+        <path key={dx} d={`M${x + dx - 1.6} ${y}q1.6 ${length} 3.2 0Z`} fill="#fff8ec" stroke="rgba(120,70,60,.35)" strokeWidth=".8" strokeLinejoin="round" />
+      ))}
+    </g>
+  );
+}
+
 /* ---------- Fuego ---------- */
 
 /** Sabia y Heroica: un dragoncito rechoncho con alas de murciélago y cola en llamas. */
@@ -86,11 +97,17 @@ function EmberDragon({ plus, mood, fills: { body, soft, accent }, paint }: { plu
             strokeWidth="1.6"
             strokeLinecap="round"
           />
+          <path d={plus ? "M5 37l-4-8 8 5Z" : "M17 53l-4-8 8 5Z"} fill="#fff8ec" stroke="rgba(120,70,60,.4)" strokeWidth=".8" strokeLinejoin="round" />
         </Pair>
       </g>
 
       <g className="pet-tail">
         <Tube d="M104 126c20 8 38 0 40-18" width={12} fill={body} />
+        <g fill={accent} stroke={EDGE} strokeWidth="1.4" strokeLinejoin="round">
+          <path d="M117 130l3-8 5 6Z" />
+          <path d="M131 125l5-7 3 8Z" />
+          {plus ? <path d="M141 115l6-5 1 8Z" /> : null}
+        </g>
         <path
           d={plus ? "M142 112c-12-6-12-20-4-30 1 8 6 10 10 10-2-8 2-16 8-20 1 10 6 18 2 28-3 8-9 12-16 12Z" : "M142 110c-8-5-8-14-2-21 1 5 4 7 7 7-1-5 1-10 5-13 1 7 4 12 1 19-2 5-6 8-11 8Z"}
           fill={plus ? paint.ember : accent}
@@ -102,7 +119,10 @@ function EmberDragon({ plus, mood, fills: { body, soft, accent }, paint }: { plu
 
       <Pair>
         <ellipse cx="50" cy="112" rx="8" ry="11" fill={body} stroke={EDGE} strokeWidth="2.4" transform="rotate(22 50 112)" />
+        <Claws x={45} y={120} spread={3.2} length={3.2} angle={22} />
+        {plus ? <path d="M44.5 106.5l9.5 4.5" stroke={paint.gold} strokeWidth="4.2" strokeLinecap="round" /> : null}
         <ellipse cx="64" cy="144" rx="13" ry="7" fill={accent} stroke={EDGE} strokeWidth="2.4" />
+        <Claws x={64} y={149} spread={5.4} length={3.8} />
       </Pair>
       <path d="M80 74c24 0 36 22 34 44-2 18-15 28-34 28s-32-10-34-28c-2-22 10-44 34-44Z" fill={body} stroke={EDGE} strokeWidth="3" />
       <path d="M80 98c12 0 18 10 18 21 0 12-8 19-18 19s-18-7-18-19c0-11 6-21 18-21Z" fill={soft} opacity=".92" />
@@ -116,6 +136,7 @@ function EmberDragon({ plus, mood, fills: { body, soft, accent }, paint }: { plu
 
       <Pair>
         <path d="M60 44C54 32 46 20 34 14c14-2 26 8 32 22Z" fill={plus ? paint.gold : accent} stroke={EDGE} strokeWidth="2.4" strokeLinejoin="round" />
+        <path d="M58 36C54 29 48 23 42 19" fill="none" stroke="rgba(255,255,255,.55)" strokeWidth="1.4" strokeLinecap="round" />
         <path d="M48 70l-16-6 6 10-8 5 18 1Z" fill={accent} stroke={EDGE} strokeWidth="2" strokeLinejoin="round" />
       </Pair>
       <circle cx="80" cy="66" r="34" fill={body} stroke={EDGE} strokeWidth="3" />
@@ -175,23 +196,44 @@ function Phoenix({ level, mood, fills: { body, soft, accent }, paint }: { level:
 
       <g className="pet-wings">
         <Pair>
+          {feathers.slice(0, level === 0 ? 3 : 4).map(([angle, scale]) => (
+            <path key={`under-${angle}`} d={FEATHER} transform={`translate(60 98) rotate(${angle - 13}) scale(${scale * wingScale * 0.8})`} fill={level === 2 ? paint.gold : paint.crimson} stroke={EDGE} strokeWidth="1.6" strokeLinejoin="round" opacity=".9" />
+          ))}
           {feathers.slice(0, level === 0 ? 3 : 4).map(([angle, scale, fill]) => (
-            <path key={angle} d={FEATHER} transform={`translate(58 94) rotate(${angle}) scale(${scale * wingScale})`} fill={fill} stroke={EDGE} strokeWidth="1.8" strokeLinejoin="round" />
+            <g key={angle} transform={`translate(58 94) rotate(${angle}) scale(${scale * wingScale})`}>
+              <path d={FEATHER} fill={fill} stroke={EDGE} strokeWidth="1.8" strokeLinejoin="round" />
+              <path d="M-4 0C-18-2-32-3-46-2" fill="none" stroke="rgba(255,255,255,.55)" strokeWidth="1.1" strokeLinecap="round" />
+              {level >= 1 ? <circle cx="-47" cy="-2" r="2.4" fill={paint.gold} stroke={EDGE} strokeWidth=".7" /> : null}
+            </g>
           ))}
           {level === 2 ? <path d={FEATHER} transform="translate(60 88) rotate(64) scale(0.8)" fill={paint.gold} stroke={EDGE} strokeWidth="1.6" /> : null}
         </Pair>
       </g>
 
-      {[-28, 0, 28].slice(0, level === 0 ? 3 : 3).map((angle) => (
+      {(level === 0 ? [-28, 0, 28] : [-52, -28, 0, 28, 52]).map((angle) => (
         <path key={angle} d="M0 0C-8 -8 -6 -22 2 -32C2 -22 10 -18 8 -8C6 -3 3 0 0 0Z" transform={`translate(80 44) rotate(${angle}) scale(${angle === 0 ? 1.15 : 0.9})`} fill={level === 2 ? paint.gold : paint.ember} stroke={EDGE} strokeWidth="1.8" strokeLinejoin="round" />
       ))}
 
       <path d="M80 62c22 0 32 22 30 44-2 20-14 32-30 32s-28-12-30-32c-2-22 8-44 30-44Z" fill={body} stroke={EDGE} strokeWidth="3" />
       <path d="M80 94c10 0 16 10 15 21-1 11-7 17-15 17s-14-6-15-17c-1-11 5-21 15-21Z" fill={soft} opacity=".9" />
       <path d="M72 108l8 5 8-5M72 118l8 5 8-5" stroke="rgba(239,66,111,.35)" fill="none" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      {level >= 1 ? <path d="M66 100c5 3 7 8 6 14M94 100c-5 3-7 8-6 14" fill="none" stroke={paint.gold} strokeWidth="1.8" strokeLinecap="round" /> : null}
+      {level === 2 ? (
+        <g>
+          <circle cx="80" cy="98" r="6.5" fill={paint.gold} stroke={EDGE} strokeWidth="1.4" />
+          <circle cx="80" cy="98" r="3" fill={paint.crimson} />
+        </g>
+      ) : null}
       <Pair>
         <path d="M72 136l-4 8M74 137v9M76 136l4 8" stroke="#f6b73c" strokeWidth="2.4" strokeLinecap="round" />
       </Pair>
+      {level >= 1 ? (
+        <Pair>
+          {[[60, 80, 34], [67, 84, 18], [74, 86, 6]].map(([x, y, r]) => (
+            <path key={x} d="M0 0c-4 5-4 11 0 15 4-4 4-10 0-15Z" transform={`translate(${x} ${y}) rotate(${r})`} fill={paint.ember} stroke={EDGE} strokeWidth="1.4" strokeLinejoin="round" />
+          ))}
+        </Pair>
+      ) : null}
       <circle cx="80" cy="60" r="27" fill={body} stroke={EDGE} strokeWidth="3" />
       <ellipse cx="66" cy="46" rx="10" ry="5.5" fill="rgba(255,255,255,.35)" transform="rotate(-24 66 46)" />
       {level === 2 ? <path d="M66 38l4-11 10 7 10-7 4 11Z" fill={paint.gold} stroke={EDGE} strokeWidth="1.6" strokeLinejoin="round" /> : null}
@@ -222,7 +264,15 @@ function EternalSun({ mood, fills, paint }: Omit<FormProps, "tier">) {
           />
         ))}
       </g>
+      <g>
+        {[-24, 0, 24].map((angle) => (
+          <path key={angle} d="M0 0C-7-7-6-19 1-28 1-19 8-15 7-7 5-3 3 0 0 0Z" transform={`rotate(${angle} 80 80) translate(80 34) scale(${angle === 0 ? 1.1 : 0.85})`} fill={angle === 0 ? paint.gold : paint.ember} stroke="rgba(255,240,200,.95)" strokeWidth="1.6" strokeLinejoin="round" />
+        ))}
+      </g>
       <circle cx="80" cy="80" r="50" fill="none" stroke={paint.gold} strokeWidth="4" />
+      {Array.from({ length: 16 }, (_, index) => (
+        <circle key={index} cx="80" cy="30" r="2.2" transform={`rotate(${index * 22.5 + 11.25} 80 80)`} fill={paint.lantern} stroke="rgba(255,240,200,.95)" strokeWidth=".8" />
+      ))}
       <circle cx="80" cy="80" r="46" fill={fills.body} stroke="rgba(255,248,220,.95)" strokeWidth="3" />
       <circle cx="80" cy="80" r="38" fill="none" stroke="rgba(255,255,255,.28)" strokeWidth="2" />
       <ellipse cx="64" cy="60" rx="15" ry="8" fill="rgba(255,255,255,.42)" transform="rotate(-26 64 60)" />
@@ -261,15 +311,22 @@ function FrostAxolotl({ plus, mood, fills: { body, soft }, paint }: { plus: bool
       <path className="pet-tail" d="M104 122c18 2 34-8 40-24 3 12-1 25-10 32-9 6-21 6-30 0Z" fill={plus ? paint.ice : soft} stroke={EDGE} strokeWidth="2.4" strokeLinejoin="round" />
       <Pair>
         <ellipse cx="62" cy="140" rx="11" ry="6.5" fill={body} stroke={EDGE} strokeWidth="2.2" />
+        <path d="M57 142.5v3M62 143.5v3M67 142.5v3" stroke="rgba(60,110,170,.4)" strokeWidth="1.4" strokeLinecap="round" />
         <ellipse cx="53" cy="118" rx="7" ry="10" fill={body} stroke={EDGE} strokeWidth="2.2" transform="rotate(26 53 118)" />
+        <path d="M47 125.5l-2 3M50.5 127l-1 3.2" stroke="rgba(60,110,170,.4)" strokeWidth="1.3" strokeLinecap="round" />
       </Pair>
       <ellipse cx="80" cy="118" rx="31" ry="24" fill={body} stroke={EDGE} strokeWidth="3" />
       <ellipse cx="80" cy="124" rx="18" ry="14" fill="#ffffff" opacity=".42" />
       <Pair>
         {[26, 0, -26].map((angle) => (
-          <path key={angle} d={FROND} transform={`translate(40 72) rotate(${angle}) scale(${plus ? 1.18 : 1})`} fill={plus ? paint.prism : paint.rose} stroke={EDGE} strokeWidth="1.8" strokeLinejoin="round" />
+          <g key={angle} transform={`translate(40 72) rotate(${angle}) scale(${plus ? 1.18 : 1})`}>
+            <path d={FROND} fill={plus ? paint.prism : paint.rose} stroke={EDGE} strokeWidth="1.8" strokeLinejoin="round" />
+            <path d="M-2 1C-8-1-16-2-23-1M-5 3C-10 5-15 8-19 10" fill="none" stroke="rgba(255,255,255,.6)" strokeWidth="1" strokeLinecap="round" />
+          </g>
         ))}
       </Pair>
+      <path d="M58 50C62 38 70 31 80 30C90 31 98 38 102 50C95 47 88 45 80 45S65 47 58 50Z" fill={plus ? paint.ice : soft} stroke={EDGE} strokeWidth="1.8" strokeLinejoin="round" opacity=".92" />
+      <path d="M68 44l-2-8M80 44v-11M92 44l2-8" stroke="rgba(90,140,200,.4)" strokeWidth="1.2" strokeLinecap="round" />
       <ellipse cx="80" cy="78" rx="44" ry="34" fill={body} stroke={EDGE} strokeWidth="3" />
       <ellipse cx="62" cy="58" rx="14" ry="7" fill="rgba(255,255,255,.45)" transform="rotate(-18 62 58)" />
       <g fill={paint.aqua} opacity=".35">
@@ -278,7 +335,7 @@ function FrostAxolotl({ plus, mood, fills: { body, soft }, paint }: { plus: bool
         <circle cx="58" cy="100" r="2.4" />
       </g>
       <Pair>
-        <ellipse cx="52" cy="95" rx="7" ry="3.4" fill="rgba(255,140,180,.35)" />
+        <ellipse cx="52" cy="95" rx="7" ry="3.4" fill="rgba(255,140,180,.2)" />
       </Pair>
       {plus ? <path d="M64 50l4-18 7 13 5-20 5 20 7-13 4 18Z" fill={paint.ice} stroke={EDGE} strokeWidth="2" strokeLinejoin="round" /> : null}
       <Face mood={mood} y={82} />
@@ -317,6 +374,7 @@ function TideDragon({ level, mood, fills: { body, soft, accent }, paint }: { lev
       </g>
       <Tube d="M84 136C66 118 98 100 80 74" width={24} fill={body} />
       <path d="M84 136C66 118 98 100 80 74" fill="none" stroke={soft} strokeWidth="8" strokeLinecap="round" opacity=".45" />
+      <path d="M72 124q5 4 10 1M78 110q5 4 10 0M84 98q4 3 8-1M80 86q4 3 8 0" fill="none" stroke="rgba(255,255,255,.55)" strokeWidth="1.4" strokeLinecap="round" />
       {level >= 1 ? (
         <g fill={accent} stroke={EDGE} strokeWidth="1.4" strokeLinejoin="round">
           <path d="M92 90l12-4-8 10Z" />
@@ -334,9 +392,10 @@ function TideDragon({ level, mood, fills: { body, soft, accent }, paint }: { lev
       <ellipse cx="80" cy="54" rx="32" ry="28" fill={body} stroke={EDGE} strokeWidth="3" />
       <ellipse cx="80" cy="70" rx="18" ry="8.5" fill={soft} opacity=".6" />
       <ellipse cx="66" cy="38" rx="10" ry="5" fill="rgba(255,255,255,.45)" transform="rotate(-20 66 38)" />
-      {level >= 1 ? (
-        <path d="M60 70c-14 2-24 10-28 22M100 70c14 2 24 10 28 22" stroke={soft} strokeWidth="2.6" fill="none" strokeLinecap="round" />
-      ) : null}
+      <Pair>
+        <path d={level >= 1 ? "M62 70C48 71 38 79 34 92c-1 5 2 8 6 6" : "M62 70C52 71 45 76 42 84"} stroke={soft} strokeWidth="2.6" fill="none" strokeLinecap="round" />
+      </Pair>
+      <path d="M68 28C72 22 76 20 80 20S88 22 92 28C88 27 84 26 80 26S72 27 68 28Z" fill={accent} stroke={EDGE} strokeWidth="1.6" strokeLinejoin="round" />
       {level === 2 ? <path d="M64 30l3-14 7 9 6-14 6 14 7-9 3 14Z" fill={paint.gold} stroke={EDGE} strokeWidth="1.8" strokeLinejoin="round" /> : null}
       <Face mood={mood} y={54} />
       {level === 2 ? (
@@ -357,12 +416,14 @@ function SkyWhale({ mood, fills: { body }, paint }: Omit<FormProps, "tier">) {
     <>
       <circle cx="80" cy="84" r="76" fill={paint.glow} opacity=".6" />
       <ellipse className="pet-orbit" cx="80" cy="86" rx="74" ry="30" fill="none" stroke={paint.gold} strokeWidth="1.6" strokeDasharray="2 8" opacity=".75" />
+      <path d="M112 96C132 104 150 122 150 142M118 88C140 92 156 106 158 124" fill="none" stroke={paint.prism} strokeWidth="4" strokeLinecap="round" opacity=".75" />
       <g className="pet-tail">
         <Tube d="M116 90C130 78 136 62 132 44" width={16} fill={paint.night} />
         <path d="M132 50C124 38 112 32 100 32c6 7 14 13 30 20 10-9 20-14 30-15-12-6-22-4-28 5Z" fill={paint.night} stroke={EDGE} strokeWidth="2.4" strokeLinejoin="round" />
       </g>
       <Pair>
         <path d="M34 108c-12 4-22 12-24 24 13 0 24-7 28-18Z" fill={paint.night} stroke={EDGE} strokeWidth="2.4" strokeLinejoin="round" />
+        <path d="M31 112c-6 4-11 9-14 15M34 115c-4 4-8 8-11 13" fill="none" stroke="rgba(255,255,255,.4)" strokeWidth="1.2" strokeLinecap="round" />
       </Pair>
       <path d="M80 44c38 0 60 22 60 48 0 26-26 42-60 42S20 118 20 92c0-26 22-48 60-48Z" fill={body} stroke={EDGE} strokeWidth="3" />
       <path d="M22 84c2-24 26-40 58-40s56 16 58 40c-16-8-36-12-58-12S38 76 22 84Z" fill={paint.night} />
@@ -370,8 +431,12 @@ function SkyWhale({ mood, fills: { body }, paint }: Omit<FormProps, "tier">) {
         {[[46, 62], [60, 54], [78, 58], [96, 52], [112, 60], [70, 68]].map(([x, y]) => <circle key={`${x}-${y}`} cx={x} cy={y} r="1.8" />)}
       </g>
       <path d="M46 62L60 54L78 58L96 52L112 60M78 58L70 68" stroke="rgba(255,251,230,.55)" strokeWidth=".9" fill="none" />
+      <path d="M22 84C38 76 58 72 80 72S122 76 138 84" fill="none" stroke={paint.gold} strokeWidth="1.8" strokeLinecap="round" />
+      {[[40, 78], [60, 73.4], [80, 72], [100, 73.4], [120, 78]].map(([x, y]) => <circle key={x} cx={x} cy={y} r="1.9" fill={paint.gold} stroke="rgba(255,255,255,.8)" strokeWidth=".6" />)}
+      {[[60, 54], [96, 52]].map(([x, y]) => <circle key={`g${x}`} cx={x} cy={y} r="4" fill={paint.glow} />)}
       <path d="M32 108c14 16 30 24 48 24s34-8 48-24" fill="none" stroke="rgba(255,255,255,.5)" strokeWidth="2" strokeLinecap="round" />
       <path d="M44 118c10 7 22 10 36 10s26-3 36-10" fill="none" stroke="rgba(255,255,255,.4)" strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M56 126c7 4 15 6 24 6s17-2 24-6" fill="none" stroke="rgba(255,255,255,.3)" strokeWidth="1.6" strokeLinecap="round" />
       <path d="M80 44c-2-10-10-16-18-16M80 44c0-12 0-18 0-26M80 44c2-10 10-16 18-16" stroke={paint.aqua} strokeWidth="4" fill="none" strokeLinecap="round" />
       <Spark x={62} y={24} r={4} fill="#eafcff" />
       <Spark x={80} y={12} r={4.6} />
@@ -392,7 +457,7 @@ function Fawn({ plus, mood, fills: { body, soft }, paint }: { plus: boolean } & 
       {plus ? <circle cx="80" cy="84" r="70" fill={paint.glow} opacity=".5" /> : null}
       <ellipse cx="108" cy="116" rx="7" ry="5" fill="#fff4dc" stroke={EDGE} strokeWidth="1.6" />
       <Pair>
-        <Tube d="M68 128v17" width={8} fill={body} />
+        <Tube d="M68 128c.4 6 .4 11 0 17" width={8} fill={body} />
         <ellipse cx="68" cy="148" rx="5" ry="3" fill="#4a2c1c" />
       </Pair>
       <ellipse cx="80" cy="122" rx="30" ry="18" fill={body} stroke={EDGE} strokeWidth="2.6" />
@@ -412,7 +477,7 @@ function Fawn({ plus, mood, fills: { body, soft }, paint }: { plus: boolean } & 
       ) : null}
       <Pair>
         <g fill="none" stroke={BARK} strokeWidth="4.5" strokeLinecap="round">
-          <path d={plus ? "M66 50C58 36 56 22 62 6M60 32C50 28 42 20 40 8M58 42C48 42 38 38 32 30M62 18C68 14 70 8 70 2" : "M66 50C60 38 58 28 62 16M61 34C53 30 47 24 45 16"} />
+          <path d={plus ? "M66 50C58 36 56 22 62 6M60 32C50 28 42 20 40 8M58 42C48 42 38 38 32 30M62 18C68 14 70 8 70 2" : "M66 50C60 38 58 28 62 16M61 34C53 30 47 24 45 16M62 24C67 21 69 16 69 11"} />
         </g>
         <g fill={soft} stroke={EDGE} strokeWidth="1.2">
           <ellipse cx={plus ? 62 : 62} cy={plus ? 6 : 16} rx="6" ry="3.4" transform={`rotate(-40 62 ${plus ? 6 : 16})`} />
@@ -433,7 +498,15 @@ function Fawn({ plus, mood, fills: { body, soft }, paint }: { plus: boolean } & 
       ) : (
         <Flower x={98} y={22} r={3.6} />
       )}
+      <Pair>
+        {[[62, 106, 30], [70, 110, 14], [78, 112, 2]].map(([x, y, r]) => (
+          <path key={x} d="M0 0c-4 4-4 10 0 13 4-3 4-9 0-13Z" transform={`translate(${x} ${y}) rotate(${r})`} fill={paint.leaf} stroke={EDGE} strokeWidth="1.2" strokeLinejoin="round" />
+        ))}
+      </Pair>
       <path d="M80 44c24 0 36 18 34 38-2 18-16 30-34 30S48 100 46 82c-2-20 10-38 34-38Z" fill={body} stroke={EDGE} strokeWidth="3" />
+      <Pair>
+        <path d="M49 88l-7 3 7 2-4 4 8-1Z" fill="#fff4dc" stroke={EDGE} strokeWidth="1" strokeLinejoin="round" />
+      </Pair>
       <ellipse cx="80" cy="99" rx="17" ry="11" fill="#fff4dc" />
       <g fill="#fff4dc" opacity=".8">
         <circle cx="68" cy="56" r="2.4" />
@@ -490,7 +563,16 @@ function ForestTurtle({ level, mood, fills: { body, soft, accent }, paint }: { l
       <g fill="none" stroke="rgba(70,40,20,.35)" strokeWidth="2" strokeLinejoin="round">
         <path d="M60 96l8-8h24l8 8-8 9H68Z" />
         <path d="M34 110l10-8 14 3M126 110l-10-8-14 3" />
+        <path d="M40 98l6-8h12l2 6-6 8H44ZM120 98l-6-8h-12l-2 6 6 8h12Z" />
+        <path d="M70 80l4-6h12l4 6-4 6H74Z" />
       </g>
+      {level >= 1 ? (
+        <g fill="none" stroke="#e6ffb0" strokeWidth="1.6" strokeLinecap="round" opacity=".9">
+          <path d="M80 91v10M75 96h10" />
+          <path d="M50 94l4 4-4 4M110 94l-4 4 4 4" />
+          <path d="M78 77h4" />
+        </g>
+      ) : null}
       {level >= 1 ? (
         <g>
           <path d="M30 112c0-6 4-10 8-10s8 4 8 10Z" fill={paint.crimson} stroke={EDGE} strokeWidth="1.4" />
@@ -501,9 +583,14 @@ function ForestTurtle({ level, mood, fills: { body, soft, accent }, paint }: { l
       ) : null}
       <path d="M18 118h124c0 6-4 10-10 10H28c-6 0-10-4-10-10Z" fill={BARK} stroke={EDGE} strokeWidth="2" />
       <Pair>
+        <path d="M24 124c-3 6-2 12 2 15M30 125c-1 5 0 9 3 11" fill="none" stroke="#4f9a4a" strokeWidth="1.8" strokeLinecap="round" />
+        <ellipse cx="26" cy="140" rx="3" ry="2" fill={paint.leaf} transform="rotate(30 26 140)" />
         <ellipse cx="46" cy="136" rx="13" ry="10" fill={soft} stroke={EDGE} strokeWidth="2.4" />
+        <Claws x={44} y={144} spread={5} length={3.4} />
       </Pair>
       <circle cx="80" cy="120" r="29" fill={soft} stroke={EDGE} strokeWidth="3" />
+      <path d="M58 108c6-4 12-4 16-1M102 108c-6-4-12-4-16-1" fill="none" stroke="rgba(40,110,60,.3)" strokeWidth="2" strokeLinecap="round" />
+      {level >= 1 ? <path d="M80 97c-3 3-3 7 0 9 3-2 3-6 0-9Z" fill="#e6ffb0" stroke="rgba(255,255,255,.8)" strokeWidth=".8" /> : null}
       <ellipse cx="68" cy="104" rx="9" ry="5" fill="rgba(255,255,255,.4)" transform="rotate(-24 68 104)" />
       <Face mood={mood} y={119} />
       {level === 2 ? <Fireflies points={[[18, 70], [142, 64], [24, 30], [138, 22], [150, 100]]} /> : <Fireflies points={[[20, 72], [140, 66]]} />}
@@ -522,9 +609,13 @@ function LunaMoth({ mood, paint }: Omit<FormProps, "tier">) {
           <path d="M80 80C66 44 34 16 12 22 4 42 14 70 42 86c14 6 28 4 38-6Z" fill={paint.leaf} stroke={EDGE} strokeWidth="2.6" strokeLinejoin="round" />
           <path d="M78 80C60 58 40 38 20 28M78 82C58 72 40 66 22 64M76 86C60 86 48 84 36 82M78 96C66 104 56 116 50 132" fill="none" stroke="rgba(255,255,255,.55)" strokeWidth="1.4" strokeLinecap="round" />
           <path d="M12 22C4 42 14 70 42 86" fill="none" stroke={paint.gold} strokeWidth="2.6" strokeLinecap="round" opacity=".85" />
+          <circle cx="40" cy="50" r="13" fill="none" stroke={paint.gold} strokeWidth="1.6" />
           <circle cx="40" cy="50" r="10" fill={paint.lantern} stroke={EDGE} strokeWidth="1.6" />
           <circle cx="40" cy="50" r="5" fill={paint.rose} />
           <circle cx="38.5" cy="48.5" r="1.8" fill="#ffffff" />
+          <path d="M42 126c-3 12 4 22-2 34" fill="none" stroke={paint.gold} strokeWidth="2" strokeLinecap="round" opacity=".85" />
+          <path d="M22 64C40 72 56 80 70 84" fill="none" stroke="rgba(255,255,255,.35)" strokeWidth="1" strokeDasharray="1 4" strokeLinecap="round" />
+          <circle cx="56" cy="118" r="7.4" fill="none" stroke={paint.gold} strokeWidth="1.2" />
           <circle cx="56" cy="118" r="5.4" fill={paint.lantern} stroke={EDGE} strokeWidth="1.2" />
           <circle cx="56" cy="118" r="2.4" fill={paint.rose} />
         </Pair>
@@ -539,6 +630,7 @@ function LunaMoth({ mood, paint }: Omit<FormProps, "tier">) {
         {[56, 64, 72, 80, 88, 96, 104].map((x, index) => <circle key={x} cx={x} cy={index % 2 ? 84 : 86} r="6" />)}
       </g>
       <circle cx="80" cy="66" r="24" fill="#fff8e8" stroke={EDGE} strokeWidth="3" />
+      <path d="M84 44a6 6 0 1 1-8 7 4.6 4.6 0 1 0 8-7Z" fill={paint.gold} stroke="rgba(255,255,255,.9)" strokeWidth=".8" />
       <Face mood={mood} y={67} />
       <Spark x={20} y={112} r={4} />
       <Spark x={142} y={112} r={4} />
@@ -571,17 +663,21 @@ function StormOwl({ plus, mood, fills: { body, soft }, paint }: { plus: boolean 
               <path key={angle} d={FEATHER} transform={`translate(46 96) rotate(${angle}) scale(${index === 1 ? 1.05 : 0.92})`} fill={index === 1 ? soft : body} stroke={EDGE} strokeWidth="1.8" strokeLinejoin="round" />
             ))
           ) : (
-            <path d="M40 86c-11 12-13 30-5 44 9-4 13-14 13-26 0-8-2-14-8-18Z" fill={body} stroke={EDGE} strokeWidth="2.4" strokeLinejoin="round" />
+            <g>
+              <path d="M40 86c-11 12-13 30-5 44 9-4 13-14 13-26 0-8-2-14-8-18Z" fill={body} stroke={EDGE} strokeWidth="2.4" strokeLinejoin="round" />
+              <path d="M40 94c-5 8-6 18-3 28M45 98c-2 7-2 14 0 20" fill="none" stroke="rgba(70,90,140,.35)" strokeWidth="1.4" strokeLinecap="round" />
+            </g>
           )}
         </Pair>
       </g>
       <Pair>
         <path d="M56 50L46 22l22 20Z" fill={body} stroke={EDGE} strokeWidth="2.4" strokeLinejoin="round" />
+        <path d="M56 45L50 30l10 10Z" fill={soft} opacity=".8" />
         <path d="M70 140l-4 6M74 141v7M78 140l4 6" stroke="#f6c94c" strokeWidth="2.6" strokeLinecap="round" />
       </Pair>
       <path d="M80 40c28 0 44 20 44 46 0 24-6 40-16 48-6 4-12 2-16 6-4-4-8-6-12-6s-8 2-12 6c-4-4-10-2-16-6-10-8-16-24-16-48 0-26 16-46 44-46Z" fill={body} stroke={EDGE} strokeWidth="3" />
       <path d="M80 62c-6-6-14-8-22-6-10 4-14 14-12 24 2 12 14 18 24 16 4 0 8-2 10-4 2 2 6 4 10 4 10 2 22-4 24-16 2-10-2-20-12-24-8-2-16 0-22 6Z" fill={soft} opacity=".95" />
-      <path d="M66 114l6 4 6-4M82 114l6 4 6-4M74 124l6 4 6-4" stroke="rgba(70,90,140,.4)" fill="none" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M66 114l6 4 6-4M82 114l6 4 6-4M74 124l6 4 6-4M58 124l6 4 6-4M90 124l6 4 6-4M66 133l6 4 6-4M82 133l6 4 6-4" stroke="rgba(70,90,140,.4)" fill="none" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
       <path d="M88 96l-9 12h7l-5 11 12-15h-7l5-8Z" fill={bolt} stroke="#fff6c2" strokeWidth="1.2" strokeLinejoin="round" />
       <ellipse cx="62" cy="52" rx="10" ry="5" fill="rgba(255,255,255,.42)" transform="rotate(-22 62 52)" />
       <Face mood={mood} y={80} beak />
@@ -608,7 +704,13 @@ function CloudPegasus({ level, mood, fills: { body, soft }, paint }: { level: nu
       <g className="pet-wings">
         <Pair>
           {[46, 28, 10, -8].slice(0, level === 0 ? 3 : 4).map((angle, index) => (
-            <path key={angle} d={FEATHER} transform={`translate(62 100) rotate(${angle}) scale(${(index === 1 ? 1.2 : 1.05) * (level === 0 ? 0.95 : 1.1)})`} fill={wing} stroke={EDGE} strokeWidth="1.8" strokeLinejoin="round" />
+            <path key={`under-${angle}`} d={FEATHER} transform={`translate(64 104) rotate(${angle - 12}) scale(${(index === 1 ? 1.2 : 1.05) * (level === 0 ? 0.95 : 1.1) * 0.78})`} fill={level === 0 ? paint.wind : paint.plum} stroke={EDGE} strokeWidth="1.6" strokeLinejoin="round" opacity=".85" />
+          ))}
+          {[46, 28, 10, -8].slice(0, level === 0 ? 3 : 4).map((angle, index) => (
+            <g key={angle} transform={`translate(62 100) rotate(${angle}) scale(${(index === 1 ? 1.2 : 1.05) * (level === 0 ? 0.95 : 1.1)})`}>
+              <path d={FEATHER} fill={wing} stroke={EDGE} strokeWidth="1.8" strokeLinejoin="round" />
+              <path d="M-4 0C-18-2-32-3-46-2" fill="none" stroke="rgba(120,140,200,.4)" strokeWidth="1.1" strokeLinecap="round" />
+            </g>
           ))}
         </Pair>
       </g>
@@ -616,8 +718,12 @@ function CloudPegasus({ level, mood, fills: { body, soft }, paint }: { level: nu
         {[[110, 118, 8], [118, 126, 7], [114, 134, 6]].map(([x, y, r], index) => <circle key={`${x}-${y}`} cx={x} cy={y} r={r} fill={mane[index]} stroke={EDGE} strokeWidth="1.6" />)}
       </g>
       <Pair>
-        <Tube d="M68 130v15" width={8} fill={body} />
+        <Tube d="M68 130c.4 5 .4 10 0 15" width={8} fill={body} />
         <rect x="63" y="144" width="10" height="5" rx="2" fill={paint.gold} />
+        <g fill="#ffffff" stroke={EDGE} strokeWidth="1">
+          <circle cx="64.5" cy="141" r="3.2" />
+          <circle cx="71.5" cy="141" r="3.2" />
+        </g>
       </Pair>
       <ellipse cx="80" cy="124" rx="32" ry="17" fill={body} stroke={EDGE} strokeWidth="2.6" />
       {level === 2 ? <path d="M86 122a8 8 0 1 1-8-10 6 6 0 1 0 8 10Z" fill={paint.moon} stroke={EDGE} strokeWidth="1.2" /> : null}
@@ -636,6 +742,13 @@ function CloudPegasus({ level, mood, fills: { body, soft }, paint }: { level: nu
         <circle cx="86" cy="42" r="8" fill={mane[0]} />
       </g>
       <ellipse cx="80" cy="100" rx="20" ry="13" fill={soft} />
+      {level >= 1 ? (
+        <g>
+          <path d="M56 116c8 6 16 8 24 8s16-2 24-8" fill="none" stroke={paint.gold} strokeWidth="2.6" strokeLinecap="round" />
+          <circle cx="80" cy="124" r="4.2" fill={paint.gold} stroke={EDGE} strokeWidth="1" />
+          <circle cx="80" cy="124" r="2" fill={level === 2 ? paint.prism : paint.aqua} />
+        </g>
+      ) : null}
       <g fill="rgba(90,110,160,.5)">
         <ellipse cx="73" cy="103" rx="2.2" ry="1.6" />
         <ellipse cx="87" cy="103" rx="2.2" ry="1.6" />
@@ -664,6 +777,8 @@ function DreamMoon({ mood, fills: { body }, paint }: Omit<FormProps, "tier">) {
         <Spark x={80} y={50} r={7} fill="#ffe27a" />
       </g>
       <path d={CRESCENT} fill={paint.moon} stroke={EDGE} strokeWidth="3" />
+      <path d="M20.4 46.7A64 64 0 1 0 139.6 46.7" fill="none" stroke={paint.gold} strokeWidth="1.4" />
+      <path d="M139.6 46.7A60 60 0 0 1 20.4 46.7" fill="none" stroke={paint.gold} strokeWidth="2" strokeDasharray="0.1 6" strokeLinecap="round" />
       <g fill="rgba(222,178,80,.28)">
         <circle cx="40" cy="98" r="5" />
         <circle cx="122" cy="96" r="4" />

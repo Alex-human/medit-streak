@@ -30,8 +30,8 @@ function statusLines(card: PetCard): string[] {
   return lines.length > 0 ? lines : ["Hoy habéis meditado los dos"];
 }
 
-/** La mascota con lo que lleva puesto. `items` son las piezas que esta persona ya ha estrenado. */
-export default function PetCreatureCard({ card, items, hiddenCount = 0, size = "normal" }: { card: PetCard; items: OwnedItem[]; hiddenCount?: number; size?: "normal" | "large" }) {
+/** La mascota con sus piezas estrenadas y la silueta de las que están por revelar. */
+export default function PetCreatureCard({ card, items, previewItems = [], readyCount = 0, size = "normal" }: { card: PetCard; items: OwnedItem[]; previewItems?: OwnedItem[]; readyCount?: number; size?: "normal" | "large" }) {
   const { life, identity } = card;
   const stageIndex = PET_STAGES.findIndex((item) => item.id === life.stage);
   const nextStage = PET_STAGES[stageIndex + 1];
@@ -49,6 +49,7 @@ export default function PetCreatureCard({ card, items, hiddenCount = 0, size = "
           mood={life.mood}
           eggPhase={life.eggPhase}
           items={items}
+          previewItems={previewItems}
           ancestral={life.ancestral}
           name={petName(card)}
           size={size}
@@ -73,8 +74,15 @@ export default function PetCreatureCard({ card, items, hiddenCount = 0, size = "
 
         <div className="text-[11px] muted mt-1.5 leading-4">
           {statusLines(card).map((line) => <p key={line}>{line}</p>)}
-          {hiddenCount > 0 ? <p>Estreno en tu próxima meditación</p> : null}
         </div>
+        {previewItems.length > 0 ? (
+          <p className="pet-preview-note mt-2" role="status">
+            <span className="pet-preview-note-spark" aria-hidden="true">✦</span>
+            <span>{readyCount > 0
+              ? `Medita para revelar ${previewItems.length === 1 ? "tu complemento" : "tus complementos"}`
+              : `Mañana, al meditar, ${previewItems.length === 1 ? "aparecerá un nuevo complemento" : "aparecerán nuevos complementos"}`}</span>
+          </p>
+        ) : null}
       </div>
     </article>
   );

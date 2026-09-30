@@ -7,13 +7,14 @@ import ChoicePanel from "./ChoicePanel";
 import PetAvatar from "./PetAvatar";
 import PetCreatureCard from "./PetCreatureCard";
 import { loadSocialSnapshot, type PetCard } from "@/lib/cloud/social";
-import { equippedItems, itemName } from "@/lib/social/catalog";
+import { itemName } from "@/lib/social/catalog";
 import { markRevealed, splitReveal } from "@/lib/social/reveal";
 
 export default function PetShelf({ celebrate, onCelebrationClose }: { celebrate: boolean; onCelebrationClose: () => void }) {
   const { user } = useCloud();
   const [cards, setCards] = useState<PetCard[]>([]);
   const [loading, setLoading] = useState(true);
+  const [celebrationReady, setCelebrationReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
@@ -39,15 +40,19 @@ export default function PetShelf({ celebrate, onCelebrationClose }: { celebrate:
 
   // La celebración llega tras guardar una sesión: vuelve a cargar para enseñar el vínculo ya sumado.
   useEffect(() => {
-    if (celebrate) void refresh();
+    if (!celebrate) return;
+    let active = true;
+    void refresh().then(() => { if (active) setCelebrationReady(true); });
+    return () => { active = false; };
   }, [celebrate, refresh]);
 
   if (!user) return null;
   // Las tarjetas solo existen tras cargar en el cliente, así que leer el estreno local aquí no afecta a la hidratación.
-  const reveals = cards.map(splitReveal);
+  const reveals = cards.map((card) => splitReveal(card));
 
   function closeCelebration() {
-    cards.forEach(markRevealed);
+    cards.forEach((card) => markRevealed(card));
+    setCelebrationReady(false);
     onCelebrationClose();
   }
 
@@ -64,22 +69,22 @@ export default function PetShelf({ celebrate, onCelebrationClose }: { celebrate:
         ) : null}
         {cards.map((card, index) => (
           <div key={card.pet.id} className="grid gap-2">
-            <PetCreatureCard card={card} items={reveals[index].shown} hiddenCount={reveals[index].fresh.length} />
+            <PetCreatureCard card={card} items={reveals[index].shown} previewItems={reveals[index].fresh} readyCount={reveals[index].ready.length} />
             <ChoicePanel card={card} onChanged={refresh} />
           </div>
         ))}
       </section>
 
-      {celebrate && !loading && cards.length > 0 ? (
+      {celebrate && celebrationReady && !loading && !error && cards.length > 0 ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4" role="dialog" aria-modal="true" aria-label="Vuestra mascota después de meditar">
           <div className="absolute inset-0 celebration-backdrop" />
           <section className="relative celebration-panel glass-popover p-4 soft-reveal grid gap-3">
             <div className="glass-chip inline-flex justify-self-start">Meditación completada</div>
             {cards.map((card, index) => (
               <div key={card.pet.id} className="grid gap-2">
-                <PetCreatureCard card={card} items={equippedItems(card.pet.outfit, card.owned)} />
-                {reveals[index].fresh.length > 0 ? (
-                  <p className="text-sm text-center"><strong>Estreno:</strong> {reveals[index].fresh.map(itemName).join(", ")}</p>
+                <PetCreatureCard card={card} items={[...reveals[index].shown, ...reveals[index].ready]} previewItems={reveals[index].fresh.filter((item) => !reveals[index].ready.some((ready) => ready.id === item.id))} />
+                {reveals[index].ready.length > 0 ? (
+                  <p className="text-sm text-center"><strong>Estreno:</strong> {reveals[index].ready.map(itemName).join(", ")}</p>
                 ) : null}
               </div>
             ))}

@@ -1,9 +1,10 @@
 import type { PetCard } from "../cloud/social";
+import { toDayString } from "../dates";
 import { equippedItems, type OwnedItem } from "./catalog";
 
 /**
- * Estreno: cada persona ve una pieza nueva sobre la mascota por primera vez en la
- * celebración de su siguiente meditación. Hasta entonces la pieza está guardada.
+ * Estreno: cada persona ve una pieza nueva en la celebración de una meditación
+ * posterior al día en que se confirmó. Hasta entonces aparece como silueta.
  * Se recuerda en este dispositivo; si falla el almacenamiento, no se oculta nada.
  */
 function key(userId: string, petId: string) {
@@ -32,15 +33,25 @@ function writeSeenItems(userId: string, petId: string, itemIds: Iterable<string>
 const seenKey = (item: OwnedItem) => `${item.id}:${item.level}`;
 
 /** Separa lo que esta persona ya ha estrenado de lo que verá en su próxima celebración. */
-export function splitReveal(card: PetCard): { shown: OwnedItem[]; fresh: OwnedItem[] } {
+export function splitReveal(card: PetCard, todayDay = toDayString(new Date())): { shown: OwnedItem[]; fresh: OwnedItem[]; ready: OwnedItem[] } {
   const equipped = equippedItems(card.pet.outfit, card.owned);
   const seen = readSeenItems(card.currentUserId, card.pet.id);
-  if (seen === null) return { shown: equipped, fresh: [] };
-  return { shown: equipped.filter((item) => seen.has(seenKey(item))), fresh: equipped.filter((item) => !seen.has(seenKey(item))) };
+  if (seen === null) return { shown: equipped, fresh: [], ready: [] };
+  const shown = equipped.filter((item) => seen.has(seenKey(item)));
+  const fresh = equipped.filter((item) => !seen.has(seenKey(item)));
+  const ready = fresh.filter((item) => {
+    const lastConfirmation = card.choices
+      .filter((choice) => choice.confirmed_at && "item" in choice.payload && choice.payload.item === item.id)
+      .map((choice) => choice.confirmed_at as string)
+      .sort()
+      .at(-1);
+    return lastConfirmation && toDayString(new Date(lastConfirmation)) < todayDay;
+  });
+  return { shown, fresh, ready };
 }
 
-export function markRevealed(card: PetCard) {
+export function markRevealed(card: PetCard, todayDay = toDayString(new Date())) {
   const seen = readSeenItems(card.currentUserId, card.pet.id) ?? new Set<string>();
-  for (const item of equippedItems(card.pet.outfit, card.owned)) seen.add(seenKey(item));
+  for (const item of splitReveal(card, todayDay).ready) seen.add(seenKey(item));
   writeSeenItems(card.currentUserId, card.pet.id, seen);
 }

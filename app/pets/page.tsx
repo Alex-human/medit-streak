@@ -102,7 +102,7 @@ function PetSheet({ card, onChanged }: { card: PetCard; onChanged: () => Promise
 
   return (
     <>
-      <PetCreatureCard card={card} items={reveal.shown} hiddenCount={reveal.fresh.length} size="large" />
+      <PetCreatureCard card={card} items={reveal.shown} previewItems={reveal.fresh} readyCount={reveal.ready.length} size="large" />
       <ChoicePanel card={card} onChanged={onChanged} />
 
       {card.owned.length > 0 || orders.length > 0 ? (

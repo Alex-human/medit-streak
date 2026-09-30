@@ -1,2 +1,7 @@
 active/
 ios/
+out/
+.next/
+node_modules/
+.env*
+*.tsbuildinfo

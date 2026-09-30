@@ -210,6 +210,7 @@ export default function FriendsPage() {
 }
 
 function FriendCard({ connection, card, onRemove }: { connection: FriendConnection; card?: PetCard; onRemove: () => void }) {
+  const reveal = card ? splitReveal(card) : null;
   return (
     <article className="friend-card">
       <div className="flex items-center gap-3">
@@ -224,7 +225,8 @@ function FriendCard({ connection, card, onRemove }: { connection: FriendConnecti
           stage={card?.life.stage ?? "bebe"}
           mood={card?.life.mood ?? "dormida"}
           eggPhase={card ? card.life.eggPhase : 0}
-          items={card ? splitReveal(card).shown : []}
+          items={reveal?.shown ?? []}
+          previewItems={reveal?.fresh ?? []}
           ancestral={card?.life.ancestral}
           name={card?.identity?.name ?? "Huevo"}
           size="small"

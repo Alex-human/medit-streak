@@ -743,14 +743,16 @@ const ANCHORS: Record<PetKind, Anchors[]> = {
 const BACK_SLOTS: Slot[] = ["suelo", "espalda", "cola"];
 const FRONT_SLOTS: Slot[] = ["cuello", "cabeza", "mano"];
 
-function ItemLayer({ items, slots, anchors, ids }: { items: OwnedItem[]; slots: Slot[]; anchors: Anchors; ids: ItemIds }) {
+function ItemLayer({ items, slots, anchors, ids, shadowFilterId }: { items: OwnedItem[]; slots: Slot[]; anchors: Anchors; ids: ItemIds; shadowFilterId?: string }) {
   return slots.map((slot) => {
     const item = items.find((candidate) => candidate.slot === slot);
     if (!item) return null;
     const [x, y, scale] = anchors[slot];
     return (
       <g key={slot} transform={`translate(${x} ${y}) scale(${scale})`}>
-        <ItemPiece id={item.id} level={item.level} ids={ids} />
+        <g className={shadowFilterId ? "pet-item-shadow" : undefined} filter={shadowFilterId ? `url(#${shadowFilterId})` : undefined}>
+          <ItemPiece id={item.id} level={item.level} ids={ids} />
+        </g>
       </g>
     );
   });
@@ -767,6 +769,7 @@ export default function PetAvatar({
   mood,
   eggPhase = null,
   items = [],
+  previewItems = [],
   ancestral = false,
   name,
   size = "normal",
@@ -779,6 +782,8 @@ export default function PetAvatar({
   eggPhase?: EggPhase | null;
   /** Piezas puestas, una por hueco y con su nivel; el huevo no lleva nada. */
   items?: OwnedItem[];
+  /** Siluetas de piezas confirmadas que esta persona estrenará más adelante. */
+  previewItems?: OwnedItem[];
   ancestral?: boolean;
   name: string;
   size?: "small" | "normal" | "large";
@@ -787,6 +792,7 @@ export default function PetAvatar({
   const ids = { body: `pet-body-${rawId}`, soft: `pet-soft-${rawId}`, accent: `pet-accent-${rawId}`, egg: `pet-egg-${rawId}` };
   const fills = { body: `url(#${ids.body})`, soft: `url(#${ids.soft})`, accent: `url(#${ids.accent})` };
   const itemIds = Object.fromEntries(ITEM_GRADIENTS.map((key) => [key, `pet-${key}-${rawId}`])) as ItemIds;
+  const shadowFilterId = `pet-shadow-${rawId}`;
   const paint = Object.fromEntries(ITEM_GRADIENTS.map((key) => [key, `url(#${itemIds[key]})`])) as Paint;
   const stageIndex = PET_STAGES.findIndex((item) => item.id === stage);
   const bodyKind = kind ?? "nube";
@@ -796,18 +802,25 @@ export default function PetAvatar({
   const evolved = stageIndex >= 6;
   const anchors = ANCHORS[bodyKind][stageIndex];
   const worn = inEgg !== null ? [] : items;
+  const shadows = inEgg !== null ? [] : previewItems;
   const label = inEgg !== null
     ? `${name}, huevo, día ${inEgg + 1}`
     : eggPhase === 4
       ? `${name}, recién nacida, ${mood}`
-      : `${name}, ${PET_STAGES[stageIndex].label}, ${mood}`;
+      : `${name}, ${PET_STAGES[stageIndex].label}, ${mood}${shadows.length > 0 ? ", con un complemento por revelar" : ""}`;
 
   return (
     <div className={`pet-avatar pet-avatar-${size} pet-avatar-${kind ?? "huevo"} pet-avatar-${mood}${inEgg !== null ? " pet-avatar-egg" : ""}`} role="img" aria-label={label}>
       <span className="pet-avatar-aura" aria-hidden="true" />
       <svg viewBox="0 0 160 160" aria-hidden="true">
         <defs>
-          {worn.length > 0 || ancestral || evolved ? <ItemDefs ids={itemIds} /> : null}
+          {worn.length > 0 || shadows.length > 0 || ancestral || evolved ? <ItemDefs ids={itemIds} /> : null}
+          {shadows.length > 0 ? (
+            <filter id={shadowFilterId} x="-60%" y="-60%" width="220%" height="220%">
+              <feColorMatrix type="matrix" values="0 0 0 0 0.23  0 0 0 0 0.24  0 0 0 0 0.39  0 0 0 0.72 0" />
+              <feGaussianBlur stdDeviation="0.65" />
+            </filter>
+          ) : null}
           <radialGradient id={ids.body} cx="35%" cy="25%" r="82%">
             <stop offset="0%" stopColor={colors.body[0]} />
             <stop offset="58%" stopColor={colors.body[1]} />
@@ -835,11 +848,13 @@ export default function PetAvatar({
           ) : (
             <>
               <ItemLayer items={worn} slots={BACK_SLOTS} anchors={anchors} ids={itemIds} />
+              <ItemLayer items={shadows} slots={BACK_SLOTS} anchors={anchors} ids={itemIds} shadowFilterId={shadowFilterId} />
               {eggPhase === 4 ? <HatchShells ids={ids} /> : null}
               {evolved
                 ? EVOLVED[bodyKind]({ tier: stageIndex - 6, mood, fills, paint })
                 : DRAWINGS[bodyKind]({ stageIndex, mood, fills })}
               <ItemLayer items={worn} slots={FRONT_SLOTS} anchors={anchors} ids={itemIds} />
+              <ItemLayer items={shadows} slots={FRONT_SLOTS} anchors={anchors} ids={itemIds} shadowFilterId={shadowFilterId} />
             </>
           )}
         </g>

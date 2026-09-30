@@ -621,7 +621,11 @@ html[data-time-phase="night"] {
 .pet-egg { transform-origin: 80px 128px; animation: eggWobble 2.8s ease-in-out infinite; }
 .pet-egg-hatching { animation: eggShake 1.3s ease-in-out infinite; }
 .pet-avatar-egg .pet-avatar-aura { opacity: .3; }
-.pet-item-shadow { opacity: .66; animation: petShadowPulse 3.4s ease-in-out infinite; }
+.pet-item-shadow { animation: petShadowPulse 3.4s ease-in-out infinite; }
+.pet-silhouette-rim { color: rgba(228,216,255,.72); }
+.pet-silhouette-ink { color: #2a2456; }
+html[data-time-phase="night"] .pet-silhouette-rim { color: rgba(228,216,255,.95); }
+html[data-time-phase="night"] .pet-silhouette-ink { color: #3b336e; }
 .pet-aura-ancestral { transform-origin: 80px 80px; animation: auraTurn 24s linear infinite; }
 .pet-orbit { transform-origin: 80px 80px; animation: auraTurn 18s linear infinite; }
 .pet-orbit-soft { transform-origin: 80px 30px; animation: petBreathe 4s ease-in-out infinite; }
@@ -666,7 +670,7 @@ html[data-time-phase="night"] {
 .celebration-panel { width: min(92vw, 38rem); max-height: 90dvh; overflow-y: auto; }
 
 @keyframes petHappy { 0%, 100% { transform: translateY(0) rotate(-1deg); } 50% { transform: translateY(-6px) rotate(1deg); } }
-@keyframes petShadowPulse { 0%, 100% { opacity: .52; } 50% { opacity: .88; } }
+@keyframes petShadowPulse { 0%, 100% { opacity: .8; } 50% { opacity: 1; } }
 @keyframes petBreathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.035); } }
 @keyframes petWorry { from { transform: translateX(-1px) rotate(-1deg); } to { transform: translateX(1px) rotate(1deg); } }
 @keyframes tailWave { 0%, 100% { transform: rotate(-5deg); } 50% { transform: rotate(8deg); } }

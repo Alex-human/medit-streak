@@ -51,6 +51,11 @@ export function Spark({ x, y, r = 3, fill = "#fff6bd" }: { x: number; y: number;
   return <path d={`M${x} ${y - r}q${r * 0.22} ${r * 0.78} ${r} ${r}q-${r * 0.78} ${r * 0.22} -${r} ${r}q-${r * 0.22} -${r * 0.78} -${r} -${r}q${r * 0.78} -${r * 0.22} ${r} -${r}Z`} fill={fill} />;
 }
 
+/** Adorno suelto (brasas, yemas): se dibuja con la pieza, pero no forma parte del contorno de su silueta. */
+export function Trim({ children }: { children: ReactNode }) {
+  return <>{children}</>;
+}
+
 /** Una pieza a su nivel: la de oro y la celestial cambian toda su pintura, y la celestial brilla por detrás. */
 export function ItemPiece({ id, level, ids }: { id: string; level: ItemLevel; ids: ItemIds }) {
   const draw = ITEM_DRAWINGS[id];
@@ -153,7 +158,7 @@ export const ITEM_DRAWINGS: Record<string, (ids: ItemIds) => ReactNode> = {
 
   campanita: (ids) => (
     <g>
-      <path d="M0-14v6" stroke={url(ids.crimson)} strokeWidth="2" strokeLinecap="round" />
+      <path d="M0-14c.4 2 .4 4 0 6" stroke={url(ids.crimson)} strokeWidth="2" strokeLinecap="round" />
       <circle cx="0" cy="-15" r="2.4" fill="none" stroke={url(ids.crimson)} strokeWidth="1.6" />
       <path d="M-7 4c0-9 14-9 14 0v3h-14z" fill={url(ids.gold)} stroke={EDGE} strokeWidth="1" strokeLinejoin="round" />
       <ellipse cx="0" cy="7" rx="8" ry="2.4" fill={url(ids.gold)} stroke={EDGE} strokeWidth="1" />
@@ -165,12 +170,12 @@ export const ITEM_DRAWINGS: Record<string, (ids: ItemIds) => ReactNode> = {
 
   baston: (ids) => (
     <g>
-      <path d="M0 30V-44" stroke={url(ids.wood)} strokeWidth="4" strokeLinecap="round" />
+      <path d="M0 30c.6-25 .6-49 0-74" stroke={url(ids.wood)} strokeWidth="4" strokeLinecap="round" />
       <path d="M0 30V-44" stroke="rgba(255,255,255,.3)" strokeWidth="1.2" strokeLinecap="round" transform="translate(-1 0)" />
       <circle cx="0" cy="-52" r="8" fill="none" stroke={url(ids.gold)} strokeWidth="3.2" />
       <circle cx="0" cy="-52" r="8" fill="none" stroke="rgba(255,255,255,.6)" strokeWidth=".9" />
       {[-6, -2.2, 2.2, 6].map((x) => <circle key={x} cx={x} cy={-45 + Math.abs(x) * 0.3} r="2.2" fill="none" stroke={url(ids.gold)} strokeWidth="1.5" />)}
-      <path d="M0-60v-4" stroke={url(ids.gold)} strokeWidth="2.4" strokeLinecap="round" />
+      <path d="M0-60c.3-1.3 .3-2.7 0-4" stroke={url(ids.gold)} strokeWidth="2.4" strokeLinecap="round" />
       <path d="M-3-34l-2 9M0-34v10M3-34l2 9" stroke={url(ids.crimson)} strokeWidth="1.5" strokeLinecap="round" />
       <Spark x={9} y={-58} r={2.4} />
     </g>
@@ -202,7 +207,7 @@ export const ITEM_DRAWINGS: Record<string, (ids: ItemIds) => ReactNode> = {
   farolillo: (ids) => (
     <g transform="translate(-36 -18)">
       <circle cx="0" cy="0" r="18" fill={url(ids.glow)} opacity=".75" />
-      <path d="M0-24v-6" stroke={url(ids.wood)} strokeWidth="1.6" strokeLinecap="round" />
+      <path d="M0-24c.3-2 .3-4 0-6" stroke={url(ids.wood)} strokeWidth="1.6" strokeLinecap="round" />
       <rect x="-6" y="-24" width="12" height="4" rx="1.5" fill="#8f1030" stroke={EDGE} strokeWidth=".8" />
       <ellipse cx="0" cy="-2" rx="11" ry="16" fill={url(ids.lantern)} stroke={EDGE} strokeWidth="1.2" />
       <path d="M-10-10h20M-11-2h22M-10 6h20" stroke="rgba(160,60,20,.35)" strokeWidth="1" />
@@ -252,7 +257,7 @@ export const ITEM_DRAWINGS: Record<string, (ids: ItemIds) => ReactNode> = {
         {[0, 72, 144, 216, 288].map((angle) => <ellipse key={angle} cy="-2.4" rx="2" ry="2.6" fill="#ffffff" transform={`rotate(${angle})`} />)}
         <circle r="1.3" fill={url(ids.gold)} />
       </g>
-      <path d="M0 0v10" stroke={url(ids.wood)} strokeWidth="3" strokeLinecap="round" />
+      <path d="M0 0c.4 3 .4 7 0 10" stroke={url(ids.wood)} strokeWidth="3" strokeLinecap="round" />
       <circle r="2.2" fill={url(ids.gold)} stroke={EDGE} strokeWidth=".8" />
       <path d="M-1 10l-2 9M1 10l2 9" stroke={url(ids.crimson)} strokeWidth="1.4" strokeLinecap="round" />
     </g>
@@ -337,7 +342,7 @@ export const ITEM_DRAWINGS: Record<string, (ids: ItemIds) => ReactNode> = {
       <g>
         <path d="M4 0C18-34 46-52 76-42C64-36 58-28 56-20C68-24 78-20 86-10C72-10 62-4 56 4C66 6 74 14 78 26C62 22 46 18 36 14C30 22 22 26 8 22Z" fill={url(ids.ember)} stroke="rgba(255,220,150,.9)" strokeWidth="1.5" strokeLinejoin="round" />
         <path d="M8 2C20-20 40-32 60-28C50-22 46-14 46-8C54-10 62-8 66-2C56-2 48 2 44 8C50 10 54 14 56 20C44 16 32 14 24 12C20 16 14 18 8 16Z" fill="#fff0a8" opacity=".55" />
-        <g fill="#ffd166"><circle cx="70" cy="-46" r="2.2" /><circle cx="84" cy="-16" r="1.8" /><circle cx="80" cy="30" r="2" /><circle cx="52" cy="-42" r="1.4" /></g>
+        <Trim><g fill="#ffd166"><circle cx="70" cy="-46" r="2.2" /><circle cx="84" cy="-16" r="1.8" /><circle cx="80" cy="30" r="2" /><circle cx="52" cy="-42" r="1.4" /></g></Trim>
       </g>
     </Mirrored>
   ),
@@ -357,7 +362,7 @@ export const ITEM_DRAWINGS: Record<string, (ids: ItemIds) => ReactNode> = {
     <g>
       <path d="M0 2C10 6 20 4 26-6C30-14 26-26 18-32C22-22 18-14 12-12C16-20 12-30 4-36C6-24 0-18-2-8Z" fill={url(ids.ember)} stroke="rgba(255,220,150,.9)" strokeWidth="1.5" strokeLinejoin="round" />
       <path d="M2 0C8 3 14 2 18-4C20-9 18-15 14-19C16-13 13-9 10-8C12-12 10-18 6-22C7-16 3-12 2-6Z" fill="#fff0a8" opacity=".75" />
-      <g fill="#ffd166"><circle cx="28" cy="-24" r="1.8" /><circle cx="22" cy="-36" r="1.4" /><circle cx="8" cy="-40" r="1.6" /></g>
+      <Trim><g fill="#ffd166"><circle cx="28" cy="-24" r="1.8" /><circle cx="22" cy="-36" r="1.4" /><circle cx="8" cy="-40" r="1.6" /></g></Trim>
     </g>
   ),
 
@@ -403,7 +408,7 @@ export const ITEM_DRAWINGS: Record<string, (ids: ItemIds) => ReactNode> = {
         <path d="M4 0C20-30 46-42 74-34C56-20 38-8 8 4Z" fill={url(ids.leaf)} />
         <path d="M4 0C20-30 46-42 74-34C56-20 38-8 8 4Z" fill={url(ids.leaf)} transform="rotate(18)" opacity=".6" />
         <path d="M8-1C30-20 50-28 68-32M10 6C32-6 50-10 66-12" fill="none" stroke="rgba(46,139,75,.5)" strokeWidth="1.1" strokeLinecap="round" />
-        <circle cx="66" cy="-38" r="2.4" fill="#ffd5e7" />
+        <Trim><circle cx="66" cy="-38" r="2.4" fill="#ffd5e7" /></Trim>
       </g>
     </Mirrored>
   ),

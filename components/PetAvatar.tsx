@@ -4,6 +4,7 @@ import type { OwnedItem, Slot } from "@/lib/social/catalog";
 import { EVOLVED, type Paint } from "./PetEvolutions";
 import Face from "./PetFace";
 import { AncestralAura, ITEM_GRADIENTS, ItemDefs, ItemPiece, Spark as Sparkle, type ItemIds } from "./PetItems";
+import ItemSilhouette from "./PetSilhouette";
 
 type EggIds = { egg: string; accent: string };
 
@@ -743,16 +744,15 @@ const ANCHORS: Record<PetKind, Anchors[]> = {
 const BACK_SLOTS: Slot[] = ["suelo", "espalda", "cola"];
 const FRONT_SLOTS: Slot[] = ["cuello", "cabeza", "mano"];
 
-function ItemLayer({ items, slots, anchors, ids, shadowFilterId }: { items: OwnedItem[]; slots: Slot[]; anchors: Anchors; ids: ItemIds; shadowFilterId?: string }) {
+/** `shadow` pinta la silueta de la pieza en lugar de la pieza: lo que se estrena en una meditación posterior. */
+function ItemLayer({ items, slots, anchors, ids, shadow = false }: { items: OwnedItem[]; slots: Slot[]; anchors: Anchors; ids: ItemIds; shadow?: boolean }) {
   return slots.map((slot) => {
     const item = items.find((candidate) => candidate.slot === slot);
     if (!item) return null;
     const [x, y, scale] = anchors[slot];
     return (
       <g key={slot} transform={`translate(${x} ${y}) scale(${scale})`}>
-        <g className={shadowFilterId ? "pet-item-shadow" : undefined} filter={shadowFilterId ? `url(#${shadowFilterId})` : undefined}>
-          <ItemPiece id={item.id} level={item.level} ids={ids} />
-        </g>
+        {shadow ? <g className="pet-item-shadow"><ItemSilhouette id={item.id} /></g> : <ItemPiece id={item.id} level={item.level} ids={ids} />}
       </g>
     );
   });
@@ -792,7 +792,6 @@ export default function PetAvatar({
   const ids = { body: `pet-body-${rawId}`, soft: `pet-soft-${rawId}`, accent: `pet-accent-${rawId}`, egg: `pet-egg-${rawId}` };
   const fills = { body: `url(#${ids.body})`, soft: `url(#${ids.soft})`, accent: `url(#${ids.accent})` };
   const itemIds = Object.fromEntries(ITEM_GRADIENTS.map((key) => [key, `pet-${key}-${rawId}`])) as ItemIds;
-  const shadowFilterId = `pet-shadow-${rawId}`;
   const paint = Object.fromEntries(ITEM_GRADIENTS.map((key) => [key, `url(#${itemIds[key]})`])) as Paint;
   const stageIndex = PET_STAGES.findIndex((item) => item.id === stage);
   const bodyKind = kind ?? "nube";
@@ -814,13 +813,7 @@ export default function PetAvatar({
       <span className="pet-avatar-aura" aria-hidden="true" />
       <svg viewBox="0 0 160 160" aria-hidden="true">
         <defs>
-          {worn.length > 0 || shadows.length > 0 || ancestral || evolved ? <ItemDefs ids={itemIds} /> : null}
-          {shadows.length > 0 ? (
-            <filter id={shadowFilterId} x="-60%" y="-60%" width="220%" height="220%">
-              <feColorMatrix type="matrix" values="0 0 0 0 0.23  0 0 0 0 0.24  0 0 0 0 0.39  0 0 0 0.72 0" />
-              <feGaussianBlur stdDeviation="0.65" />
-            </filter>
-          ) : null}
+          {worn.length > 0 || ancestral || evolved ? <ItemDefs ids={itemIds} /> : null}
           <radialGradient id={ids.body} cx="35%" cy="25%" r="82%">
             <stop offset="0%" stopColor={colors.body[0]} />
             <stop offset="58%" stopColor={colors.body[1]} />
@@ -848,13 +841,13 @@ export default function PetAvatar({
           ) : (
             <>
               <ItemLayer items={worn} slots={BACK_SLOTS} anchors={anchors} ids={itemIds} />
-              <ItemLayer items={shadows} slots={BACK_SLOTS} anchors={anchors} ids={itemIds} shadowFilterId={shadowFilterId} />
+              <ItemLayer items={shadows} slots={BACK_SLOTS} anchors={anchors} ids={itemIds} shadow />
               {eggPhase === 4 ? <HatchShells ids={ids} /> : null}
               {evolved
                 ? EVOLVED[bodyKind]({ tier: stageIndex - 6, mood, fills, paint })
                 : DRAWINGS[bodyKind]({ stageIndex, mood, fills })}
               <ItemLayer items={worn} slots={FRONT_SLOTS} anchors={anchors} ids={itemIds} />
-              <ItemLayer items={shadows} slots={FRONT_SLOTS} anchors={anchors} ids={itemIds} shadowFilterId={shadowFilterId} />
+              <ItemLayer items={shadows} slots={FRONT_SLOTS} anchors={anchors} ids={itemIds} shadow />
             </>
           )}
         </g>

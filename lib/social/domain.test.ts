@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { addDays } from "../dates";
 import { ANCESTRAL_DAY, EGG_DAYS, PET_STAGES, choiceMilestones, computePetLife, petStageForBond, type SocialSession } from "./domain";
-import { dueChoices, equippedItems, identityOf, itemsForPick, ownedItems, pendingOrders, wornOn, type ChoiceRow } from "./catalog";
+import { catalogItem, dueChoices, equippedItems, identityOf, itemsForPick, ownedItems, pendingOrders, withItem, wornOn, type ChoiceRow } from "./catalog";
 
 const owners: [string, string] = ["alex", "amiga"];
 /** Día n del calendario de pruebas: D(1) = 2026-01-01. */
@@ -208,6 +208,29 @@ describe("shared choices", () => {
     expect(worn("2026-01-18")).toEqual([["loto", 1]]);
     expect(worn("2026-01-25")).toEqual([["halo", 1]]);
     expect(worn("2026-02-05")).toEqual([["loto", 2]]);
+  });
+
+  it("keeps every floor piece and one base on at once, and still reads an outfit saved with a single floor piece", () => {
+    const pieces = ["halo", "bonsai", "farolillo", "islita", "jardin-zen"].map((item, index) =>
+      row({ id: item, milestone_day: 8 + index, payload: { item }, confirmed_at: `2026-01-${10 + index}T10:00:00Z` }));
+    const owned = ownedItems(pieces);
+    const piece = (id: string) => catalogItem(id)!;
+    const worn = (outfit: Record<string, string | undefined>) => equippedItems(outfit, owned).map((item) => item.id);
+
+    const legacy = { cabeza: "halo", suelo: "bonsai" };
+    expect(worn(legacy)).toEqual(["halo", "bonsai"]);
+
+    const withLantern = withItem(legacy, piece("farolillo"), true);
+    expect(withLantern).toEqual({ cabeza: "halo", bonsai: "bonsai", farolillo: "farolillo" });
+    expect(worn(withLantern)).toEqual(["halo", "farolillo", "bonsai"]);
+
+    // Las bases comparten hueco: la segunda sustituye a la primera.
+    const onIsland = withItem(withLantern, piece("islita"), true);
+    expect(worn(withItem(onIsland, piece("jardin-zen"), true))).toEqual(["halo", "farolillo", "bonsai", "jardin-zen"]);
+    expect(worn(withItem(onIsland, piece("bonsai"), false))).toEqual(["halo", "farolillo", "islita"]);
+
+    expect(wornOn(pieces, "2026-01-13").map((item) => item.id)).toEqual(["halo", "bonsai", "farolillo", "islita"]);
+    expect(wornOn(pieces, "2026-01-14").map((item) => item.id)).toEqual(["halo", "bonsai", "farolillo", "jardin-zen"]);
   });
 
   it("opens the identity, keeps proposals pending and repeats milestones in each life", () => {

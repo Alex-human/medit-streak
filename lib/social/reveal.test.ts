@@ -9,7 +9,7 @@ function cardFor(choices: ChoiceRow[], userId = "alex"): PetCard {
     currentUserId: userId,
     owned: ownedItems(choices),
     choices,
-  } as PetCard;
+  } as unknown as PetCard;
 }
 
 function haloChoice(confirmedAt: string, id = "first"): ChoiceRow {

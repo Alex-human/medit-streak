@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import type { ItemLevel } from "@/lib/social/catalog";
 
 /** Degradados compartidos por las piezas y las formas altas; cada avatar los declara con sus propios ids. */
-export const ITEM_GRADIENTS = ["gold", "wood", "crimson", "rose", "night", "plum", "bronze", "lantern", "wind", "ember", "magma", "ice", "aqua", "leaf", "gilded", "prism", "moon", "glow"] as const;
+export const ITEM_GRADIENTS = ["gold", "wood", "crimson", "rose", "night", "plum", "bronze", "lantern", "wind", "ember", "magma", "ice", "aqua", "leaf", "gilded", "prism", "moon", "earth", "sand", "glow"] as const;
 export type ItemIds = Record<(typeof ITEM_GRADIENTS)[number], string>;
 
 const LINEAR: Record<Exclude<keyof ItemIds, "glow">, string[]> = {
@@ -23,6 +23,8 @@ const LINEAR: Record<Exclude<keyof ItemIds, "glow">, string[]> = {
   gilded: ["#fffbe0", "#ffd65a", "#d08f1c"],
   prism: ["#fff0fb", "#c9b6ff", "#7fdcff"],
   moon: ["#fffdf2", "#fff1b8", "#f0c766"],
+  earth: ["#a8754a", "#7a4f33", "#4b2f25"],
+  sand: ["#fffaf0", "#f4e6c8", "#ecd9b4"],
 };
 
 export function ItemDefs({ ids }: { ids: ItemIds }) {
@@ -56,8 +58,8 @@ export function Trim({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
-/** Una pieza a su nivel: la de oro y la celestial cambian toda su pintura, y la celestial brilla por detrás. */
-export function ItemPiece({ id, level, ids }: { id: string; level: ItemLevel; ids: ItemIds }) {
+/** Una pieza a su nivel: la de oro y la celestial cambian toda su pintura, y la celestial brilla por detrás. `depth` es el grosor de una base. */
+export function ItemPiece({ id, level, ids, depth }: { id: string; level: ItemLevel; ids: ItemIds; depth?: number }) {
   const draw = ITEM_DRAWINGS[id];
   if (!draw) return null;
   const tone = level === 2 ? ids.gilded : ids.prism;
@@ -71,7 +73,7 @@ export function ItemPiece({ id, level, ids }: { id: string; level: ItemLevel; id
           <Spark x={21} y={-4} r={2.6} fill="#e3f8ff" />
         </g>
       ) : null}
-      {draw(paint)}
+      {draw(paint, depth)}
     </>
   );
 }
@@ -92,7 +94,13 @@ function Mirrored({ children }: { children: ReactNode }) {
  * espalda = centro de la espalda (detrás del cuerpo), cola = base de la cola,
  * mano = empuñadura, suelo = centro del suelo bajo la criatura.
  */
-export const ITEM_DRAWINGS: Record<string, (ids: ItemIds) => ReactNode> = {
+/** Radio con el que se dibujan las bases; el avatar las escala hasta lo que ocupan la criatura y sus piezas de suelo. */
+export const BASE_RADIUS = 26;
+/** Grosor de la isla en radios cuando hay sitio debajo; con una criatura que llena el marco es una losa fina. */
+export const ISLAND_DEPTH = 0.4;
+
+/** Cada pieza se dibuja desde su punto de apoyo: las de suelo y las bases, desde donde tocan el suelo. */
+export const ITEM_DRAWINGS: Record<string, (ids: ItemIds, depth?: number) => ReactNode> = {
   mala: (ids) => (
     <g>
       <path d="M-17 -3Q-15 14 0 15Q15 14 17 -3" fill="none" stroke="#5b3a1e" strokeWidth="1.6" />
@@ -193,7 +201,7 @@ export const ITEM_DRAWINGS: Record<string, (ids: ItemIds) => ReactNode> = {
   ),
 
   cuenco: (ids) => (
-    <g transform="translate(34 -2)">
+    <g>
       <path d="M-13-9c0 11 26 11 26 0z" fill={url(ids.bronze)} stroke={EDGE} strokeWidth="1.1" />
       <ellipse cx="0" cy="-9" rx="13" ry="3.4" fill="#f5d39a" stroke={url(ids.gold)} strokeWidth="1.4" />
       <ellipse cx="0" cy="-9" rx="9" ry="1.8" fill="#c78b46" opacity=".8" />
@@ -205,7 +213,7 @@ export const ITEM_DRAWINGS: Record<string, (ids: ItemIds) => ReactNode> = {
   ),
 
   farolillo: (ids) => (
-    <g transform="translate(-36 -18)">
+    <g transform="translate(0 -26)">
       <circle cx="0" cy="0" r="18" fill={url(ids.glow)} opacity=".75" />
       <path d="M0-24c.3-2 .3-4 0-6" stroke={url(ids.wood)} strokeWidth="1.6" strokeLinecap="round" />
       <rect x="-6" y="-24" width="12" height="4" rx="1.5" fill="#8f1030" stroke={EDGE} strokeWidth=".8" />
@@ -290,7 +298,7 @@ export const ITEM_DRAWINGS: Record<string, (ids: ItemIds) => ReactNode> = {
   ),
 
   gong: (ids) => (
-    <g transform="translate(-38 0)">
+    <g>
       <path d="M-14 0V-44M14 0V-44" stroke={url(ids.wood)} strokeWidth="3.2" strokeLinecap="round" />
       <path d="M-20 -46c6 2 34 2 40 0" fill="none" stroke={url(ids.crimson)} strokeWidth="4" strokeLinecap="round" />
       <path d="M-6 -44l3 8M6 -44l-3 8" stroke="rgba(255,255,255,.7)" strokeWidth="1" />
@@ -300,6 +308,49 @@ export const ITEM_DRAWINGS: Record<string, (ids: ItemIds) => ReactNode> = {
       <ellipse cx="-4" cy="-29" rx="3.6" ry="2" fill="rgba(255,255,255,.55)" transform="rotate(-30 -4 -29)" />
       <path d="M16 -4l10 -10" stroke={url(ids.wood)} strokeWidth="2.2" strokeLinecap="round" />
       <circle cx="26" cy="-14" r="3" fill="#e9c7a4" stroke={EDGE} strokeWidth=".8" />
+    </g>
+  ),
+
+  islita: (ids, depth = ISLAND_DEPTH) => {
+    const d = BASE_RADIUS * depth;
+    return (
+      <g>
+        <ellipse cy={d * 1.5 + 3.2} rx="16" ry="1.4" fill="rgba(15,44,68,.18)" />
+        <path d={`M-26 0C-22.4 ${d * 1.05} -8.8 ${d * 1.55} 1 ${d * 1.5}C13 ${d * 1.42} 23.4 ${d * 0.8} 26 0Z`} fill={url(ids.earth)} stroke={EDGE} strokeWidth=".6" strokeLinejoin="round" />
+        <path d={`M-13 ${d * 0.75}q2.6 ${d * 0.2} 5.7 ${d * 0.12}M5.2 ${d * 0.95}q3.1 ${d * 0.1} 6.8 ${-d * 0.1}`} fill="none" stroke="rgba(255,236,200,.28)" strokeWidth=".7" strokeLinecap="round" />
+        <ellipse cy="1.4" rx="26" ry="5.7" fill={url(ids.leaf)} />
+        <ellipse cy="1.4" rx="26" ry="5.7" fill="rgba(20,80,45,.5)" />
+        <ellipse rx="26" ry="5.7" fill={url(ids.leaf)} stroke={EDGE} strokeWidth=".6" />
+        <Trim>
+          <path d="M-20.8 .5q-.5 -2.6 -1.6 -3.6M-20.8 .5q.5 -2.6 1.6 -3.1M-20.8 .5c.2 -1.4 .2 -2.8 0 -4.2M22.4 .8q-.5 -2 -1.6 -2.6M22.4 .8q.5 -2 1.6 -2.6" fill="none" stroke="#2f8f4c" strokeWidth=".8" strokeLinecap="round" />
+          <ellipse cx="15.6" cy="2.9" rx="2.2" ry="1.4" fill="#cfd6e4" stroke={EDGE} strokeWidth=".4" />
+          <ellipse cx="12.2" cy="4" rx="1.4" ry=".9" fill="#aab4c8" stroke={EDGE} strokeWidth=".35" />
+          <g transform="translate(3.1 4)">
+            {[0, 72, 144, 216, 288].map((angle) => <ellipse key={angle} cy="-1" rx=".8" ry="1.05" fill="#ffffff" transform={`rotate(${angle})`} />)}
+            <circle r=".6" fill={url(ids.gold)} />
+          </g>
+        </Trim>
+      </g>
+    );
+  },
+
+  "jardin-zen": (ids) => (
+    <g>
+      <ellipse cy="3.6" rx="25" ry="5.9" fill="rgba(15,44,68,.2)" />
+      <ellipse cy="1.8" rx="26" ry="6.5" fill={url(ids.wood)} stroke={EDGE} strokeWidth=".5" />
+      <ellipse rx="26" ry="6.5" fill={url(ids.sand)} stroke={url(ids.wood)} strokeWidth=".9" />
+      <g fill="none" stroke="rgba(160,116,62,.55)" strokeWidth=".5">
+        <ellipse rx="22.4" ry="5.3" />
+        <ellipse rx="18.7" ry="4.3" />
+        <ellipse rx="15.1" ry="3.3" />
+      </g>
+      <Trim>
+        <g stroke={EDGE} strokeWidth=".4">
+          <ellipse cx="16.1" cy="2" rx="2.4" ry="1.6" fill="#8d97ad" />
+          <ellipse cx="12.5" cy="3.6" rx="1.5" ry="1" fill="#b3bccd" />
+          <ellipse cx="18.7" cy=".3" rx="1.05" ry=".7" fill="#a2acc0" />
+        </g>
+      </Trim>
     </g>
   ),
 

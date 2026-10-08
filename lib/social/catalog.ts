@@ -1,7 +1,7 @@
 import { toDayString } from "../dates";
 import { EGG_DAYS, PET_KINDS, type ChoicePick, type PetKind, type PetLife } from "./domain";
 
-export const SLOTS = ["cabeza", "cuello", "espalda", "cola", "mano", "suelo"] as const;
+export const SLOTS = ["cabeza", "cuello", "espalda", "cola", "mano", "suelo", "base"] as const;
 export type Slot = (typeof SLOTS)[number];
 
 export type ItemKind = "objeto" | "rasgo";
@@ -25,6 +25,8 @@ export const CATALOG: CatalogItem[] = [
   { id: "orbe", label: "Orbe de luz", slot: "mano", kind: "objeto" },
   { id: "bonsai", label: "Bonsái", slot: "suelo", kind: "objeto" },
   { id: "gong", label: "Gong", slot: "suelo", kind: "objeto" },
+  { id: "islita", label: "Islita flotante", slot: "base", kind: "objeto" },
+  { id: "jardin-zen", label: "Jardín zen", slot: "base", kind: "objeto" },
   { id: "alas-pegaso", label: "Alas de Pegaso", slot: "espalda", kind: "rasgo", element: "nube" },
   { id: "corona-nubes", label: "Corona de nubes", slot: "cabeza", kind: "rasgo", element: "nube" },
   { id: "estela-viento", label: "Estela de viento", slot: "cola", kind: "rasgo", element: "nube" },
@@ -80,7 +82,27 @@ export type ChoiceRow = {
   confirmed_at: string | null;
 };
 
-export type Outfit = Partial<Record<Slot, string>>;
+/** El atuendo guarda una pieza por sitio. */
+export type Outfit = Partial<Record<string, string>>;
+
+/** Las piezas de suelo conviven, cada una en su sitio; en los demás huecos una pieza sustituye a otra. */
+export function placeOf(item: CatalogItem) {
+  return item.slot === "suelo" ? item.id : item.slot;
+}
+
+/** Los atuendos antiguos guardaban una sola pieza de suelo bajo `suelo`: sigue contando como puesta. */
+export function isWorn(outfit: Outfit, item: CatalogItem) {
+  return outfit[placeOf(item)] === item.id || outfit[item.slot] === item.id;
+}
+
+/** El atuendo con una pieza puesta o quitada, ya con cada pieza de suelo en su propio sitio. */
+export function withItem(outfit: Outfit, item: CatalogItem, worn: boolean): Outfit {
+  const { suelo, ...next } = outfit;
+  if (suelo) next[suelo] = suelo;
+  if (worn) next[placeOf(item)] = item.id;
+  else delete next[placeOf(item)];
+  return next;
+}
 
 export function isIdentity(payload: ChoicePayload): payload is Identity {
   return "element" in payload && PET_KINDS.includes(payload.element);
@@ -113,12 +135,12 @@ export function ownedItems(choices: ChoiceRow[]): OwnedItem[] {
 }
 
 export function equippedItems(outfit: Outfit, owned: OwnedItem[]) {
-  return owned.filter((item) => outfit[item.slot] === item.id);
+  return owned.filter((item) => isWorn(outfit, item));
 }
 
-/** Álbum: la última pieza confirmada en cada hueco hasta ese día, con el nivel que tenía entonces. */
+/** Álbum: la última pieza confirmada en cada sitio hasta ese día, con el nivel que tenía entonces. */
 export function wornOn(choices: ChoiceRow[], day: string): OwnedItem[] {
-  return [...new Map(confirmedPieces(choices, day).map((piece) => [piece.slot, piece])).values()];
+  return [...new Map(confirmedPieces(choices, day).map((piece) => [placeOf(piece), piece])).values()];
 }
 
 export type DueChoice = { milestone: { day: number; pick: ChoicePick | "identidad" }; row: ChoiceRow | null };

@@ -6,13 +6,14 @@ import {
   dueChoices,
   identityOf,
   ownedItems,
+  withItem,
+  type CatalogItem,
   type ChoicePayload,
   type ChoiceRow,
   type DueChoice,
   type Identity,
   type Outfit,
   type OwnedItem,
-  type Slot,
 } from "@/lib/social/catalog";
 import type { SocialProfile } from "@/components/CloudProvider";
 
@@ -183,17 +184,15 @@ export async function confirmChoice(card: PetCard, row: ChoiceRow) {
   if (!payload) throw new Error("Esa propuesta ya cambió. Vuelve a mirarla.");
 
   const item = "item" in payload && payload.item ? catalogItem(payload.item) : null;
-  if (item) await wearItem(card.pet.id, item.slot, item.id);
+  if (item) await wearItem(card.pet.id, item, true);
 }
 
-/** Pone una pieza en su hueco (null lo vacía) sobre el atuendo actual de la base, no sobre el que vio la pantalla. */
-export async function wearItem(petId: string, slot: Slot, itemId: string | null) {
+/** Pone o quita una pieza de su sitio sobre el atuendo actual de la base, no sobre el que vio la pantalla. */
+export async function wearItem(petId: string, item: CatalogItem, worn: boolean) {
   const { client } = await requireClient();
   const { data, error } = await client.from("pets").select("outfit").eq("id", petId).single();
   if (error) throw error;
-  const outfit: Outfit = { ...(data.outfit as Outfit) };
-  if (itemId === null) delete outfit[slot];
-  else outfit[slot] = itemId;
+  const outfit = withItem(data.outfit as Outfit, item, worn);
   const { error: writeError } = await client.from("pets").update({ outfit }).eq("id", petId);
   if (writeError) throw writeError;
 }

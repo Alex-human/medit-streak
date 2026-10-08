@@ -64,20 +64,21 @@ function walk(node: ReactNode, inherited: Inherited, pass: Pass): ReactNode[] {
 
 const cache = new Map<string, { rim: ReactNode; ink: ReactNode } | null>();
 
-function silhouetteOf(id: string) {
-  if (!cache.has(id)) {
+function silhouetteOf(id: string, depth?: number) {
+  const key = depth === undefined ? id : `${id}:${depth}`;
+  if (!cache.has(key)) {
     const draw = ITEM_DRAWINGS[id];
-    cache.set(id, draw ? {
-      rim: createElement("g", null, ...walk(draw(PROBE), { width: 1 }, "rim")),
-      ink: createElement("g", null, ...walk(draw(PROBE), { width: 1 }, "ink")),
+    cache.set(key, draw ? {
+      rim: createElement("g", null, ...walk(draw(PROBE, depth), { width: 1 }, "rim")),
+      ink: createElement("g", null, ...walk(draw(PROBE, depth), { width: 1 }, "ink")),
     } : null);
   }
-  return cache.get(id) ?? null;
+  return cache.get(key) ?? null;
 }
 
 /** La sombra de una pieza: contorno luminoso debajo y silueta oscura encima. El color lo pone el CSS. */
-export default function ItemSilhouette({ id }: { id: string }) {
-  const parts = silhouetteOf(id);
+export default function ItemSilhouette({ id, depth }: { id: string; depth?: number }) {
+  const parts = silhouetteOf(id, depth);
   if (!parts) return null;
   return (
     <>

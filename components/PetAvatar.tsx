@@ -3,7 +3,7 @@ import { PET_STAGES, type EggPhase, type PetKind, type PetMood, type PetStage } 
 import type { OwnedItem, Slot } from "@/lib/social/catalog";
 import { EVOLVED, type Paint } from "./PetEvolutions";
 import Face from "./PetFace";
-import { AncestralAura, ITEM_GRADIENTS, ItemDefs, ItemPiece, Spark as Sparkle, type ItemIds } from "./PetItems";
+import { AncestralAura, BASE_RADIUS, ISLAND_DEPTH, ITEM_GRADIENTS, ItemDefs, ItemPiece, Spark as Sparkle, type ItemIds } from "./PetItems";
 import ItemSilhouette from "./PetSilhouette";
 
 type EggIds = { egg: string; accent: string };
@@ -679,7 +679,7 @@ function colorsFor(kind: PetKind | null, stageIndex: number) {
 }
 
 type Anchor = [x: number, y: number, scale: number];
-type Anchors = Record<Slot, Anchor>;
+type Anchors = Record<Exclude<Slot, "base">, Anchor>;
 
 /** Dónde se apoya cada pieza en cada cuerpo: coronilla, cuello, centro de la espalda, base de la cola, mano y suelo. */
 const ANCHORS: Record<PetKind, Anchors[]> = {
@@ -741,39 +741,141 @@ const ANCHORS: Record<PetKind, Anchors[]> = {
   ],
 };
 
-const BACK_SLOTS: Slot[] = ["suelo", "espalda", "cola"];
-const FRONT_SLOTS: Slot[] = ["cuello", "cabeza", "mano"];
+const BACK_SLOTS: (keyof Anchors)[] = ["suelo", "espalda", "cola"];
+const FRONT_SLOTS: (keyof Anchors)[] = ["cuello", "cabeza", "mano"];
 
-/** Piezas que no se pintan sobre la criatura sino a su lado, en un marco más ancho. */
-const SIDE_ITEMS = ["bonsai"];
-/** El marco ancho añade 20 unidades a la izquierda y 28 a la derecha; la criatura se desplaza a la izquierda para dejar sitio. */
-const WIDE_VIEWBOX = "-20 0 208 160";
-const WIDE_SHIFT = -20;
-const SIDE_X = 148;
+/** Piezas de suelo con sitio propio junto a la criatura; el zafu es la excepción y sigue debajo de ella. */
+const FLOOR_IDS = ["bonsai", "gong", "cuenco", "farolillo"];
+
+type Spot = { x: number; drop: number; size: number; front: boolean; foot: number; reach: number };
+
+/**
+ * Piezas que se apoyan en el suelo junto a la criatura, cada una en su sitio: el bonsái pegado a su
+ * izquierda y el gong detrás de él; a la derecha, donde van la cola y la mano, el cuenco delante y el
+ * farolillo detrás. `x` es la distancia a la criatura; `foot` y `reach`, lo que la pieza pisa y lo que abulta.
+ */
+function floorSpots(ids: string[], scale: number, size: number): Record<string, Spot> {
+  const has = (id: string) => ids.includes(id);
+  const left = 33 * scale + 6;
+  const right = 26 * scale + 6;
+  return {
+    ...(has("bonsai") ? { bonsai: { x: -(left + 16 * size), drop: 1.5, size, front: true, foot: 14, reach: 21 } } : {}),
+    ...(has("gong") ? { gong: { x: -((has("bonsai") ? left + 36 * size : left - 6) + 17 * size), drop: -1, size: size * 0.9, front: false, foot: 18, reach: 26 } } : {}),
+    ...(has("cuenco") ? { cuenco: { x: right + 8, drop: 6, size: size * 0.78, front: true, foot: 13, reach: 20 } } : {}),
+    ...(has("farolillo") ? { farolillo: { x: right + (has("cuenco") ? 30 : 17) * size, drop: 0, size: size * 0.82, front: false, foot: 9, reach: 14 } } : {}),
+  };
+}
+
+/** Borde inferior del dibujo de cada criatura, ya escalado: la línea que pisa. Hay que volver a medirlo si cambia un dibujo. */
+const FEET: Record<PetKind, number[]> = {
+  fuego: [106.4, 114.8, 121.4, 129.1, 142, 156, 147, 151.9, 157.7, 160.4, 162.7, 161],
+  agua: [103.4, 115.1, 121.1, 129.9, 136.1, 143.4, 142.8, 151.9, 156, 158.3, 160.5, 163],
+  bosque: [106.9, 115.3, 122.4, 129.9, 135.2, 141.2, 147, 151.9, 146.4, 148.3, 150.3, 163],
+  nube: [96.3, 112.1, 132.6, 146.2, 144.5, 165, 144.2, 155.8, 146.4, 148.3, 155.4, 163],
+};
+/** Lo más bajo que llega el suelo, y hasta dónde puede bajar una base antes de encoger la escena. */
+const GROUND_LIMIT = 158;
+const SCENE_FLOOR = 164;
+/** Con piezas a los lados el marco se ensancha; la criatura conserva su tamaño. */
+const FRAME_WIDTH = { normal: 160, wide: 208 };
+/** Lo que una base sobresale de lo que pisan la criatura y sus piezas. */
+const BASE_MARGIN: Record<string, number> = { islita: 11, "jardin-zen": 16 };
+const CONTACT_SHADOW: Record<string, string> = { islita: "rgba(24,84,52,.28)", "jardin-zen": "rgba(120,84,40,.24)" };
+
+type Scene = {
+  wide: boolean;
+  petX: number;
+  /** Medio ancho de lo que pisa la criatura. */
+  petFoot: number;
+  ground: number;
+  spots: Record<string, Spot>;
+  /** Centro y medio ancho de lo que pisan la criatura y sus piezas. */
+  mid: number;
+  half: number;
+  /** Radio de la base y grosor de la isla en radios. */
+  radius: number;
+  depth: number;
+  fit: number;
+  pivot: number;
+};
+
+/** La criatura, sus piezas de suelo y la base como un conjunto: juntas, centradas y pisando la misma línea. */
+function composeScene(kind: PetKind, stageIndex: number, scale: number, floorIds: string[], base: string | null): Scene {
+  const size = 0.52 + 0.52 * scale;
+  const spots = floorSpots(floorIds, scale, size);
+  const placed = Object.values(spots);
+  const wide = placed.length > 0;
+  const petFoot = 26 * scale + 6;
+  const reach = [-(36 * scale + 4), 36 * scale + 4, ...placed.flatMap((spot) => [spot.x - spot.reach * spot.size, spot.x + spot.reach * spot.size])];
+  const foot = [-petFoot, petFoot, ...placed.flatMap((spot) => [spot.x - spot.foot * spot.size, spot.x + spot.foot * spot.size])];
+  const petX = 80 - (Math.min(...reach) + Math.max(...reach)) / 2;
+  const ground = Math.min(FEET[kind][stageIndex], GROUND_LIMIT);
+  const half = (Math.max(...foot) - Math.min(...foot)) / 2;
+  const radius = half + (base ? BASE_MARGIN[base] : 0);
+  const slab = Math.max(7, Math.min(radius * ISLAND_DEPTH, 20, (SCENE_FLOOR - ground - 8) / 1.5));
+  const depth = slab / radius;
+  const unit = radius / BASE_RADIUS;
+  const bottom = base === "islita" ? ground - 2 + slab * 1.5 + 4.6 * unit : base === "jardin-zen" ? ground - 2 + 9.5 * unit : ground;
+  const width = Math.max(Math.max(...reach) - Math.min(...reach), base ? 2 * radius : 0);
+  const fit = Math.min(1, SCENE_FLOOR / bottom, (FRAME_WIDTH[wide ? "wide" : "normal"] - 6) / width);
+  // Al encoger, la escena queda apoyada en el borde inferior del marco en vez de subir.
+  const pivot = fit < 1 ? (Math.min(bottom, SCENE_FLOOR) - bottom * fit) / (1 - fit) : 0;
+  return { wide, petX, petFoot, ground, spots, mid: petX + (Math.min(...foot) + Math.max(...foot)) / 2, half, radius, depth, fit, pivot };
+}
+
+type LayerProps = { items: OwnedItem[]; ids: ItemIds; shadow?: boolean };
 
 /** `shadow` pinta la silueta de la pieza en lugar de la pieza: lo que se estrena en una meditación posterior. */
-function ItemLayer({ items, slots, anchors, ids, shadow = false }: { items: OwnedItem[]; slots: Slot[]; anchors: Anchors; ids: ItemIds; shadow?: boolean }) {
+function Piece({ item, ids, shadow = false, depth }: { item: OwnedItem; ids: ItemIds; shadow?: boolean; depth?: number }) {
+  return shadow ? <g className="pet-item-shadow"><ItemSilhouette id={item.id} depth={depth} /></g> : <ItemPiece id={item.id} level={item.level} ids={ids} depth={depth} />;
+}
+
+/** Piezas que la criatura lleva puestas, cada una en el anclaje de su hueco. */
+function ItemLayer({ items, slots, anchors, ids, shadow }: LayerProps & { slots: (keyof Anchors)[]; anchors: Anchors }) {
   return slots.map((slot) => {
-    const item = items.find((candidate) => candidate.slot === slot);
-    if (!item || SIDE_ITEMS.includes(item.id)) return null;
+    const item = items.find((candidate) => candidate.slot === slot && !FLOOR_IDS.includes(candidate.id));
+    if (!item) return null;
     const [x, y, scale] = anchors[slot];
     return (
       <g key={slot} transform={`translate(${x} ${y}) scale(${scale})`}>
-        {shadow ? <g className="pet-item-shadow"><ItemSilhouette id={item.id} /></g> : <ItemPiece id={item.id} level={item.level} ids={ids} />}
+        <Piece item={item} ids={ids} shadow={shadow} />
       </g>
     );
   });
 }
 
-/** La pieza de lado: apoyada en el suelo a la derecha de la criatura, sin tapar ni quedar tapada, y algo mayor cuanto más crece. */
-function SideItem({ item, scale, ids, shadow = false }: { item: OwnedItem; scale: number; ids: ItemIds; shadow?: boolean }) {
-  const size = 0.55 + 0.6 * scale;
-  const ground = 144 - (1 - scale) * 6;
+/** Piezas de suelo junto a la criatura: las de detrás se pintan antes que ella y las de delante, después. */
+function FloorLayer({ items, scene, front, ids, shadow }: LayerProps & { scene: Scene; front: boolean }) {
+  return items.map((item) => {
+    const spot = scene.spots[item.id];
+    if (!spot || spot.front !== front) return null;
+    return (
+      <g key={item.id} transform={`translate(${scene.petX + spot.x} ${scene.ground + spot.drop}) scale(${spot.size})`}>
+        <Piece item={item} ids={ids} shadow={shadow} />
+      </g>
+    );
+  });
+}
+
+/** El suelo del conjunto: la base elegida, con la sombra de lo que tiene encima, o una sola sombra para todos. */
+function Ground({ scene, base, ids, shadow }: { scene: Scene; base: OwnedItem | null; ids: ItemIds; shadow: boolean }) {
+  const { mid, ground, half, radius, depth, petX, petFoot, spots } = scene;
+  if (!base) return <ellipse cx={mid} cy={ground + 1} rx={half + 7} ry={3.2 + half * 0.09} fill="rgba(15,44,68,.2)" />;
+  const thick = radius * 0.22;
   return (
-    <g transform={`translate(${SIDE_X} ${ground}) scale(${size})`}>
-      {shadow ? null : <ellipse cy="1" rx="19" ry="3.6" fill="rgba(15,44,68,.14)" />}
-      {shadow ? <g className="pet-item-shadow"><ItemSilhouette id={item.id} /></g> : <ItemPiece id={item.id} level={item.level} ids={ids} />}
-    </g>
+    <>
+      <g transform={`translate(${mid} ${ground - 2}) scale(${radius / BASE_RADIUS})`}>
+        <Piece item={base} ids={ids} shadow={shadow} depth={depth} />
+      </g>
+      {shadow ? null : (
+        <g fill={CONTACT_SHADOW[base.id]}>
+          <ellipse cx={petX} cy={ground - 1} rx={petFoot} ry={thick * 0.4} />
+          {Object.entries(spots).map(([id, spot]) => (
+            <ellipse key={id} cx={petX + spot.x} cy={ground + spot.drop - 1} rx={spot.foot * spot.size + 1} ry={thick * 0.28} />
+          ))}
+        </g>
+      )}
+    </>
   );
 }
 
@@ -821,9 +923,12 @@ export default function PetAvatar({
   const anchors = ANCHORS[bodyKind][stageIndex];
   const worn = inEgg !== null ? [] : items;
   const shadows = inEgg !== null ? [] : previewItems;
-  const sideWorn = worn.find((item) => SIDE_ITEMS.includes(item.id));
-  const sideShadow = shadows.find((item) => SIDE_ITEMS.includes(item.id));
-  const wide = Boolean(sideWorn || sideShadow);
+  const all = [...worn, ...shadows];
+  const base = all.find((item) => item.slot === "base") ?? null;
+  const floorIds = all.flatMap((item) => (FLOOR_IDS.includes(item.id) ? [item.id] : []));
+  /** Sin piezas de suelo ni base, la criatura se pinta sola, como siempre. */
+  const scene = floorIds.length > 0 || base ? composeScene(bodyKind, stageIndex, scale, floorIds, base?.id ?? null) : null;
+  const wide = scene?.wide ?? false;
   const label = inEgg !== null
     ? `${name}, huevo, día ${inEgg + 1}`
     : eggPhase === 4
@@ -833,7 +938,7 @@ export default function PetAvatar({
   return (
     <div className={`pet-avatar pet-avatar-${size} pet-avatar-${kind ?? "huevo"} pet-avatar-${mood}${inEgg !== null ? " pet-avatar-egg" : ""}${wide ? " pet-avatar-wide" : ""}`} role="img" aria-label={label}>
       <span className="pet-avatar-aura" aria-hidden="true" />
-      <svg viewBox={wide ? WIDE_VIEWBOX : "0 0 160 160"} aria-hidden="true">
+      <svg viewBox={wide ? `${(FRAME_WIDTH.normal - FRAME_WIDTH.wide) / 2} 0 ${FRAME_WIDTH.wide} 160` : `0 0 ${FRAME_WIDTH.normal} 160`} aria-hidden="true">
         <defs>
           {worn.length > 0 || ancestral || evolved ? <ItemDefs ids={itemIds} /> : null}
           <radialGradient id={ids.body} cx="35%" cy="25%" r="82%">
@@ -855,28 +960,33 @@ export default function PetAvatar({
             <stop offset="100%" stopColor={colors.accent[1]} />
           </linearGradient>
         </defs>
-        <g transform={wide ? `translate(${WIDE_SHIFT} 0)` : undefined}>
-          {ancestral ? <AncestralAura ids={itemIds} /> : null}
-          <ellipse cx="80" cy={142 - (1 - scale) * 6} rx={16 + 28 * scale} ry={4 + 4.5 * scale} fill="rgba(15,44,68,.12)" />
-          <g style={{ transform: `translate(80px, 84px) scale(${scale}) translate(-80px, -84px)` }}>
-            {inEgg !== null ? (
-              <Egg phase={inEgg} ids={ids} />
-            ) : (
-              <>
-                <ItemLayer items={worn} slots={BACK_SLOTS} anchors={anchors} ids={itemIds} />
-                <ItemLayer items={shadows} slots={BACK_SLOTS} anchors={anchors} ids={itemIds} shadow />
-                {eggPhase === 4 ? <HatchShells ids={ids} /> : null}
-                {evolved
-                  ? EVOLVED[bodyKind]({ tier: stageIndex - 6, mood, fills, paint })
-                  : DRAWINGS[bodyKind]({ stageIndex, mood, fills })}
-                <ItemLayer items={worn} slots={FRONT_SLOTS} anchors={anchors} ids={itemIds} />
-                <ItemLayer items={shadows} slots={FRONT_SLOTS} anchors={anchors} ids={itemIds} shadow />
-              </>
-            )}
+        <g transform={scene && scene.fit < 1 ? `translate(80 ${scene.pivot}) scale(${scene.fit}) translate(-80 ${-scene.pivot})` : undefined}>
+          {scene ? <Ground scene={scene} base={base} ids={itemIds} shadow={base !== null && shadows.includes(base)} /> : null}
+          {scene ? <FloorLayer items={worn} scene={scene} front={false} ids={itemIds} /> : null}
+          {scene ? <FloorLayer items={shadows} scene={scene} front={false} ids={itemIds} shadow /> : null}
+          <g transform={scene ? `translate(${scene.petX - 80} 0)` : undefined}>
+            {ancestral ? <AncestralAura ids={itemIds} /> : null}
+            {scene ? null : <ellipse cx="80" cy={142 - (1 - scale) * 6} rx={16 + 28 * scale} ry={4 + 4.5 * scale} fill="rgba(15,44,68,.12)" />}
+            <g style={{ transform: `translate(80px, 84px) scale(${scale}) translate(-80px, -84px)` }}>
+              {inEgg !== null ? (
+                <Egg phase={inEgg} ids={ids} />
+              ) : (
+                <>
+                  <ItemLayer items={worn} slots={BACK_SLOTS} anchors={anchors} ids={itemIds} />
+                  <ItemLayer items={shadows} slots={BACK_SLOTS} anchors={anchors} ids={itemIds} shadow />
+                  {eggPhase === 4 ? <HatchShells ids={ids} /> : null}
+                  {evolved
+                    ? EVOLVED[bodyKind]({ tier: stageIndex - 6, mood, fills, paint })
+                    : DRAWINGS[bodyKind]({ stageIndex, mood, fills })}
+                  <ItemLayer items={worn} slots={FRONT_SLOTS} anchors={anchors} ids={itemIds} />
+                  <ItemLayer items={shadows} slots={FRONT_SLOTS} anchors={anchors} ids={itemIds} shadow />
+                </>
+              )}
+            </g>
           </g>
+          {scene ? <FloorLayer items={worn} scene={scene} front ids={itemIds} /> : null}
+          {scene ? <FloorLayer items={shadows} scene={scene} front ids={itemIds} shadow /> : null}
         </g>
-        {sideWorn ? <SideItem item={sideWorn} scale={scale} ids={itemIds} /> : null}
-        {sideShadow ? <SideItem item={sideShadow} scale={scale} ids={itemIds} shadow /> : null}
       </svg>
     </div>
   );

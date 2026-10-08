@@ -9,7 +9,8 @@ const FRAME: Record<Slot, string> = {
   espalda: "translate(0 4) scale(0.5)",
   cola: "translate(-12 10) scale(0.85)",
   mano: "translate(0 8) scale(0.72)",
-  suelo: "translate(0 12) scale(0.75)",
+  suelo: "translate(0 20) scale(0.75)",
+  base: "translate(0 -6) scale(1.3)",
 };
 
 /** La pieza sola, pintada al nivel que tiene o al que llegaría. */

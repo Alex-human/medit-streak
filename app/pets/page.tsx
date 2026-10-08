@@ -10,7 +10,7 @@ import PetCreatureCard, { petName } from "@/components/PetCreatureCard";
 import TimeBackground from "@/components/TimeBackground";
 import { loadSocialSnapshot, wearItem, type PetCard } from "@/lib/cloud/social";
 import { PET_STAGES } from "@/lib/social/domain";
-import { itemName, pendingOrders, SLOTS, wornOn, type Slot } from "@/lib/social/catalog";
+import { isWorn, itemName, pendingOrders, SLOTS, wornOn, type OwnedItem } from "@/lib/social/catalog";
 import { splitReveal } from "@/lib/social/reveal";
 
 export default function PetsPage() {
@@ -87,11 +87,11 @@ function PetSheet({ card, onChanged }: { card: PetCard; onChanged: () => Promise
   const reveal = splitReveal(card);
   const orders = pendingOrders(card.choices);
 
-  async function wear(slot: Slot, itemId: string | null) {
+  async function wear(item: OwnedItem, worn: boolean) {
     setBusy(true);
     setError(null);
     try {
-      await wearItem(card.pet.id, slot, itemId);
+      await wearItem(card.pet.id, item, worn);
       await onChanged();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "No se pudo cambiar el baúl.");
@@ -118,9 +118,9 @@ function PetSheet({ card, onChanged }: { card: PetCard; onChanged: () => Promise
                   <div className="text-[11px] muted">{slot[0].toUpperCase() + slot.slice(1)}</div>
                   <div className="pet-items-grid mt-1">
                     {items.map((item) => {
-                      const worn = card.pet.outfit[slot] === item.id;
+                      const worn = isWorn(card.pet.outfit, item);
                       return (
-                        <button key={item.id} type="button" disabled={busy} aria-pressed={worn} className={`pet-item-tile ${worn ? "is-active" : ""}`} onClick={() => void wear(slot, worn ? null : item.id)}>
+                        <button key={item.id} type="button" disabled={busy} aria-pressed={worn} className={`pet-item-tile ${worn ? "is-active" : ""}`} onClick={() => void wear(item, !worn)}>
                           <ItemIcon item={item} />
                           <span>{itemName(item)}</span>
                           <small>{worn ? "Puesta" : "Guardada"}</small>

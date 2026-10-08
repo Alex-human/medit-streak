@@ -276,7 +276,7 @@ export const ITEM_DRAWINGS: Record<string, (ids: ItemIds) => ReactNode> = {
   ),
 
   bonsai: (ids) => (
-    <g transform="translate(38 -2)">
+    <g>
       <path d="M-12 -9h24l-3 9h-18Z" fill={url(ids.night)} stroke={EDGE} strokeWidth="1.1" strokeLinejoin="round" />
       <rect x="-14" y="-12" width="28" height="4" rx="2" fill={url(ids.gold)} />
       <path d="M1 -12c-2-7 5-10 1-17-3-5-8-6-10-11M2 -26c4-3 9-3 12-8" fill="none" stroke={url(ids.wood)} strokeWidth="3.2" strokeLinecap="round" />

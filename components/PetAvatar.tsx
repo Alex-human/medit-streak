@@ -744,11 +744,18 @@ const ANCHORS: Record<PetKind, Anchors[]> = {
 const BACK_SLOTS: Slot[] = ["suelo", "espalda", "cola"];
 const FRONT_SLOTS: Slot[] = ["cuello", "cabeza", "mano"];
 
+/** Piezas que no se pintan sobre la criatura sino a su lado, en un marco más ancho. */
+const SIDE_ITEMS = ["bonsai"];
+/** El marco ancho añade 20 unidades a la izquierda y 28 a la derecha; la criatura se desplaza a la izquierda para dejar sitio. */
+const WIDE_VIEWBOX = "-20 0 208 160";
+const WIDE_SHIFT = -20;
+const SIDE_X = 148;
+
 /** `shadow` pinta la silueta de la pieza en lugar de la pieza: lo que se estrena en una meditación posterior. */
 function ItemLayer({ items, slots, anchors, ids, shadow = false }: { items: OwnedItem[]; slots: Slot[]; anchors: Anchors; ids: ItemIds; shadow?: boolean }) {
   return slots.map((slot) => {
     const item = items.find((candidate) => candidate.slot === slot);
-    if (!item) return null;
+    if (!item || SIDE_ITEMS.includes(item.id)) return null;
     const [x, y, scale] = anchors[slot];
     return (
       <g key={slot} transform={`translate(${x} ${y}) scale(${scale})`}>
@@ -756,6 +763,18 @@ function ItemLayer({ items, slots, anchors, ids, shadow = false }: { items: Owne
       </g>
     );
   });
+}
+
+/** La pieza de lado: apoyada en el suelo a la derecha de la criatura, sin tapar ni quedar tapada, y algo mayor cuanto más crece. */
+function SideItem({ item, scale, ids, shadow = false }: { item: OwnedItem; scale: number; ids: ItemIds; shadow?: boolean }) {
+  const size = 0.55 + 0.6 * scale;
+  const ground = 144 - (1 - scale) * 6;
+  return (
+    <g transform={`translate(${SIDE_X} ${ground}) scale(${size})`}>
+      {shadow ? null : <ellipse cy="1" rx="19" ry="3.6" fill="rgba(15,44,68,.14)" />}
+      {shadow ? <g className="pet-item-shadow"><ItemSilhouette id={item.id} /></g> : <ItemPiece id={item.id} level={item.level} ids={ids} />}
+    </g>
+  );
 }
 
 /** La escala acompaña el crecimiento; las formas altas ya ocupan el marco y crecen por dibujo, no por tamaño. */
@@ -802,6 +821,9 @@ export default function PetAvatar({
   const anchors = ANCHORS[bodyKind][stageIndex];
   const worn = inEgg !== null ? [] : items;
   const shadows = inEgg !== null ? [] : previewItems;
+  const sideWorn = worn.find((item) => SIDE_ITEMS.includes(item.id));
+  const sideShadow = shadows.find((item) => SIDE_ITEMS.includes(item.id));
+  const wide = Boolean(sideWorn || sideShadow);
   const label = inEgg !== null
     ? `${name}, huevo, día ${inEgg + 1}`
     : eggPhase === 4
@@ -809,9 +831,9 @@ export default function PetAvatar({
       : `${name}, ${PET_STAGES[stageIndex].label}, ${mood}${shadows.length > 0 ? ", con un complemento por revelar" : ""}`;
 
   return (
-    <div className={`pet-avatar pet-avatar-${size} pet-avatar-${kind ?? "huevo"} pet-avatar-${mood}${inEgg !== null ? " pet-avatar-egg" : ""}`} role="img" aria-label={label}>
+    <div className={`pet-avatar pet-avatar-${size} pet-avatar-${kind ?? "huevo"} pet-avatar-${mood}${inEgg !== null ? " pet-avatar-egg" : ""}${wide ? " pet-avatar-wide" : ""}`} role="img" aria-label={label}>
       <span className="pet-avatar-aura" aria-hidden="true" />
-      <svg viewBox="0 0 160 160" aria-hidden="true">
+      <svg viewBox={wide ? WIDE_VIEWBOX : "0 0 160 160"} aria-hidden="true">
         <defs>
           {worn.length > 0 || ancestral || evolved ? <ItemDefs ids={itemIds} /> : null}
           <radialGradient id={ids.body} cx="35%" cy="25%" r="82%">
@@ -833,24 +855,28 @@ export default function PetAvatar({
             <stop offset="100%" stopColor={colors.accent[1]} />
           </linearGradient>
         </defs>
-        {ancestral ? <AncestralAura ids={itemIds} /> : null}
-        <ellipse cx="80" cy={142 - (1 - scale) * 6} rx={16 + 28 * scale} ry={4 + 4.5 * scale} fill="rgba(15,44,68,.12)" />
-        <g style={{ transform: `translate(80px, 84px) scale(${scale}) translate(-80px, -84px)` }}>
-          {inEgg !== null ? (
-            <Egg phase={inEgg} ids={ids} />
-          ) : (
-            <>
-              <ItemLayer items={worn} slots={BACK_SLOTS} anchors={anchors} ids={itemIds} />
-              <ItemLayer items={shadows} slots={BACK_SLOTS} anchors={anchors} ids={itemIds} shadow />
-              {eggPhase === 4 ? <HatchShells ids={ids} /> : null}
-              {evolved
-                ? EVOLVED[bodyKind]({ tier: stageIndex - 6, mood, fills, paint })
-                : DRAWINGS[bodyKind]({ stageIndex, mood, fills })}
-              <ItemLayer items={worn} slots={FRONT_SLOTS} anchors={anchors} ids={itemIds} />
-              <ItemLayer items={shadows} slots={FRONT_SLOTS} anchors={anchors} ids={itemIds} shadow />
-            </>
-          )}
+        <g transform={wide ? `translate(${WIDE_SHIFT} 0)` : undefined}>
+          {ancestral ? <AncestralAura ids={itemIds} /> : null}
+          <ellipse cx="80" cy={142 - (1 - scale) * 6} rx={16 + 28 * scale} ry={4 + 4.5 * scale} fill="rgba(15,44,68,.12)" />
+          <g style={{ transform: `translate(80px, 84px) scale(${scale}) translate(-80px, -84px)` }}>
+            {inEgg !== null ? (
+              <Egg phase={inEgg} ids={ids} />
+            ) : (
+              <>
+                <ItemLayer items={worn} slots={BACK_SLOTS} anchors={anchors} ids={itemIds} />
+                <ItemLayer items={shadows} slots={BACK_SLOTS} anchors={anchors} ids={itemIds} shadow />
+                {eggPhase === 4 ? <HatchShells ids={ids} /> : null}
+                {evolved
+                  ? EVOLVED[bodyKind]({ tier: stageIndex - 6, mood, fills, paint })
+                  : DRAWINGS[bodyKind]({ stageIndex, mood, fills })}
+                <ItemLayer items={worn} slots={FRONT_SLOTS} anchors={anchors} ids={itemIds} />
+                <ItemLayer items={shadows} slots={FRONT_SLOTS} anchors={anchors} ids={itemIds} shadow />
+              </>
+            )}
+          </g>
         </g>
+        {sideWorn ? <SideItem item={sideWorn} scale={scale} ids={itemIds} /> : null}
+        {sideShadow ? <SideItem item={sideShadow} scale={scale} ids={itemIds} shadow /> : null}
       </svg>
     </div>
   );

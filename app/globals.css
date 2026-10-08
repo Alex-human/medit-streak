@@ -612,6 +612,10 @@ html[data-time-phase="night"] {
 .pet-avatar-small { width: 5rem; height: 5rem; }
 .pet-avatar-normal { width: 8rem; height: 8rem; }
 .pet-avatar-large { width: 12rem; height: 12rem; margin: 0 auto; }
+.pet-avatar-wide.pet-avatar-small { width: 6.5rem; }
+.pet-avatar-wide.pet-avatar-normal { width: 10.4rem; }
+.pet-avatar-wide.pet-avatar-large { width: 15.6rem; }
+.pet-avatar-wide .pet-avatar-aura { inset: 18% 30% 18% 14%; }
 .pet-avatar-feliz { animation: petHappy 1.8s ease-in-out infinite; }
 .pet-avatar-esperando, .pet-avatar-dormida { animation: petBreathe 3.4s ease-in-out infinite; }
 .pet-avatar-peligro { animation: petWorry .8s ease-in-out infinite alternate; }

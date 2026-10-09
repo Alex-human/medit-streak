@@ -70,6 +70,8 @@ export default function HomePage() {
   const [todayDay, setTodayDay] = useState<string | null>(null);
   const [records, setRecords] = useState<DayRecord[]>([]);
   const [hydrated, setHydrated] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [recoveries, setRecoveries] = useState(0);
   const [detailDay, setDetailDay] = useState<string | null>(null);
   const [manualDay, setManualDay] = useState<string | null>(null);
   const [manualMinutes, setManualMinutes] = useState("10");
@@ -107,8 +109,16 @@ export default function HomePage() {
     setMonthDate(startOfMonthLocal(now));
   }
 
+  const userId = cloud.user?.id;
+  // Con la nube configurada no hay nada que leer hasta saber quién ha entrado.
+  const canLoad = !cloud.configured || Boolean(userId);
+
   useEffect(() => {
     let active = true;
+    let latestRun = 0;
+    let startedAt = 0;
+    let failures = 0;
+    let retryTimer: number | undefined;
     const syncToday = () => {
       const now = new Date();
       const nextToday = toDayString(now);
@@ -119,30 +129,55 @@ export default function HomePage() {
       setMonthDate((current) => current ?? nextMonth);
     };
     const refresh = async () => {
+      if (!canLoad) return;
+      const run = ++latestRun;
+      startedAt = Date.now();
+      window.clearTimeout(retryTimer);
       try {
         await saveDueActiveTimer();
       } catch {
         // El cronómetro seguirá disponible para reintentar el guardado desde su pantalla.
       }
 
-      const next = await getAllDays();
-      if (!active) return;
-      setRecords(next);
-      setHydrated(true);
+      try {
+        const next = await getAllDays();
+        if (!active || run !== latestRun) return;
+        // Si la nube vuelve a responder tras un fallo, la mascota (que habrá fallado con ella) se recarga también.
+        if (failures > 0) setRecoveries((count) => count + 1);
+        failures = 0;
+        setRecords(next);
+        setHydrated(true);
+        setLoadFailed(false);
+      } catch {
+        if (!active || run !== latestRun) return;
+        // No poder leer no es llevar cero meditaciones: se conserva lo último cargado y se reintenta sola.
+        setLoadFailed(true);
+        retryTimer = window.setTimeout(() => void refresh(), Math.min(1000 * 2 ** failures, 10_000));
+        failures += 1;
+      }
+    };
+    // Al volver a primer plano llegan varias de estas señales seguidas: basta con una lectura.
+    const wake = () => {
+      if (document.visibilityState !== "visible") return;
+      syncToday();
+      if (Date.now() - startedAt > 1_000) void refresh();
     };
 
     syncToday();
     void refresh();
     const interval = window.setInterval(syncToday, 60_000);
-    window.addEventListener("focus", syncToday);
-    window.addEventListener("focus", refresh);
+    window.addEventListener("focus", wake);
+    window.addEventListener("pageshow", wake);
+    document.addEventListener("visibilitychange", wake);
     return () => {
       active = false;
+      window.clearTimeout(retryTimer);
       window.clearInterval(interval);
-      window.removeEventListener("focus", syncToday);
-      window.removeEventListener("focus", refresh);
+      window.removeEventListener("focus", wake);
+      window.removeEventListener("pageshow", wake);
+      document.removeEventListener("visibilitychange", wake);
     };
-  }, [cloud.user?.id]);
+  }, [canLoad, userId]);
 
   const streak = useMemo(() => {
     if (!todayDay) return 0;
@@ -381,7 +416,11 @@ export default function HomePage() {
             </div>
           </div>
 
-          <StreakHeader streak={hydrated ? streak : 0} />
+          <StreakHeader streak={hydrated ? streak : null} />
+
+          {!hydrated && loadFailed ? (
+            <div className="error-panel px-3 py-2 text-xs">No se han podido cargar tus meditaciones. Reintentando…</div>
+          ) : null}
 
           {cloud.error ? (
             <div className="error-panel px-3 py-2 text-xs flex items-center justify-between gap-3">
@@ -392,7 +431,7 @@ export default function HomePage() {
             </div>
           ) : null}
 
-          <PetShelf celebrate={celebratePets} onCelebrationClose={() => setCelebratePets(false)} />
+          <PetShelf key={recoveries} celebrate={celebratePets} onCelebrationClose={() => setCelebratePets(false)} />
 
           {hydrated && streakRecovery ? (
             <div className="recovery-panel p-3">
@@ -419,15 +458,15 @@ export default function HomePage() {
             <div className="mt-2 grid grid-cols-3 gap-2">
               <div className="glass-panel-soft p-2.5">
                 <div className="text-[11px] muted">Sesiones</div>
-                <div className="text-xl font-semibold tabular-nums">{hydrated ? monthStats.sessions : 0}</div>
+                <div className="text-xl font-semibold tabular-nums">{hydrated ? monthStats.sessions : "–"}</div>
               </div>
               <div className="glass-panel-soft p-2.5">
                 <div className="text-[11px] muted">Minutos</div>
-                <div className="text-xl font-semibold tabular-nums">{hydrated ? monthStats.minutes : 0}</div>
+                <div className="text-xl font-semibold tabular-nums">{hydrated ? monthStats.minutes : "–"}</div>
               </div>
               <div className="glass-panel-soft p-2.5">
                 <div className="text-[11px] muted">Media</div>
-                <div className="text-xl font-semibold tabular-nums">{hydrated ? monthStats.avg : 0}</div>
+                <div className="text-xl font-semibold tabular-nums">{hydrated ? monthStats.avg : "–"}</div>
                 <div className="text-[10px] muted">min/sesión</div>
               </div>
             </div>

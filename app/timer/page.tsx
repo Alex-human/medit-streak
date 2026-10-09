@@ -23,8 +23,9 @@ export default function TimerPage() {
     let active = true;
 
     const syncRecovery = async () => {
-      const records = await getAllDays();
-      if (!active) return;
+      // Si la lectura falla no se sabe qué pide la racha: se deja lo último mostrado hasta el próximo intento.
+      const records = await getAllDays().catch(() => null);
+      if (!active || !records) return;
       setStreakMinutes(getStreakRecovery(records, toDayString(new Date()))?.minutes ?? 0);
       if (cloud.user) {
         try {

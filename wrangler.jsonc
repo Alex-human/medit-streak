@@ -1,0 +1,10 @@
+// Medit Streak se sirve como web estática (npm run build:native → out/) en Cloudflare.
+// Sin funciones de servidor: no consume CPU y no puede pausarse por límites de uso como en Vercel Hobby.
+{
+  "name": "medit-streak",
+  "compatibility_date": "2026-11-19",
+  "assets": {
+    "directory": "./out",
+    "not_found_handling": "404-page"
+  }
+}

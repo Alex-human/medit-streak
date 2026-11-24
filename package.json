@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "build:native": "NEXT_OUTPUT_MODE=export next build",
+    "deploy": "npm run build:native && npx --yes wrangler@4.166.0 deploy",
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",

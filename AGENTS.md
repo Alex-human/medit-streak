@@ -10,6 +10,8 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 ## Despliegue
 
-- Todo cambio de la web (Next.js) debe quedar publicado en Vercel (proyecto `medit-streak`): al terminar, commit a `main` y push a `origin` (`Alex-human/medit-streak`) para que Vercel despliegue, y comprobar que el despliegue termina bien.
+- La web se sirve como estática en Cloudflare: https://medit-streak.autoreply-panel.workers.dev (Worker `medit-streak`, configuración en `wrangler.jsonc`). Todo cambio de la web: commit a `main`, push a `origin` (`Alex-human/medit-streak`) y `npm run deploy` (exportación estática + `wrangler deploy` con la sesión local de Cloudflare); después comprobar que la URL responde con el cambio. El push no despliega solo.
+- La app debe seguir siendo exportable como estática (`npm run build:native`): sin rutas API, middleware ni acciones de servidor, porque el hosting no ejecuta servidor.
+- Vercel quedó retirado: el 23-11-2026 pausó toda la cuenta Hobby por la CPU de otro proyecto. `vercel.json` solo redirige la URL antigua `medit-streak.vercel.app` a la nueva. El login de Google exige que la URL de la web esté en Supabase → Authentication → URL Configuration → Redirect URLs (acceso por Vercel → Storage → `medit-streak-social` → Open in Supabase).
 - La app iOS (Capacitor, `ios/`) está en pausa por decisión de Alex: no ejecutar `ios:sync`, no tocar `ios/` ni preparar TestFlight salvo que lo pida.
 - Incluir en el commit solo los archivos del cambio; dejar fuera lo ajeno (por ejemplo `ios/` o `active/`).

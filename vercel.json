@@ -1,0 +1,5 @@
+{
+  "redirects": [
+    { "source": "/:path*", "destination": "https://medit-streak.autoreply-panel.workers.dev/:path*", "permanent": false }
+  ]
+}
